@@ -1,24 +1,21 @@
-package main
+package doomsday
 
 import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"strings"
+
+	"github.com/thomasmmitchell/doomsday/storage"
 )
 
-type Backend interface {
-	List(path string) ([]string, error)
-	Get(path string) (map[string]string, error)
-}
-
-type BackendCore struct {
-	Backend  Backend
+type Core struct {
+	Backend  storage.Accessor
 	Cache    *Cache
 	BasePath string
 }
 
-func (b *BackendCore) Populate() error {
+func (b *Core) Populate() error {
 	paths, err := b.Paths()
 	if err != nil {
 		return err
@@ -26,7 +23,7 @@ func (b *BackendCore) Populate() error {
 	return b.PopulateUsing(paths)
 }
 
-func (b *BackendCore) PopulateUsing(paths PathList) error {
+func (b *Core) PopulateUsing(paths PathList) error {
 	for _, path := range paths {
 		secret, err := b.Backend.Get(path)
 		if err != nil {
@@ -42,7 +39,7 @@ func (b *BackendCore) PopulateUsing(paths PathList) error {
 	return nil
 }
 
-func (b *BackendCore) Paths() (PathList, error) {
+func (b *Core) Paths() (PathList, error) {
 	paths, err := b.recursivelyList(b.BasePath)
 	if err != nil {
 		return nil, err
@@ -51,7 +48,7 @@ func (b *BackendCore) Paths() (PathList, error) {
 	return paths, nil
 }
 
-func (b *BackendCore) recursivelyList(path string) (PathList, error) {
+func (b *Core) recursivelyList(path string) (PathList, error) {
 	var leaves []string
 	list, err := b.Backend.List(path)
 	if err != nil {

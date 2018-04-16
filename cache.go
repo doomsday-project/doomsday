@@ -1,4 +1,4 @@
-package main
+package doomsday
 
 import (
 	"regexp"
@@ -39,6 +39,16 @@ func (c *Cache) Store(path string, value CacheObject) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.store[path] = value
+}
+
+func (c *Cache) Map() map[string]CacheObject {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	ret := make(map[string]CacheObject, len(c.store))
+	for k, v := range c.store {
+		ret[k] = v
+	}
+	return ret
 }
 
 type PathList []string

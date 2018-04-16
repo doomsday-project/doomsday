@@ -6,17 +6,13 @@ import (
 	"os"
 
 	"github.com/ghodss/yaml"
+	"github.com/thomasmmitchell/doomsday/server"
+	"github.com/thomasmmitchell/doomsday/storage"
 )
 
 type config struct {
-	Backend backendConfig `yaml:"backend"`
-}
-
-type backendConfig struct {
-	Type     string            `yaml:"type"`
-	Address  string            `yaml:"address"`
-	Auth     map[string]string `yaml:"auth"`
-	BasePath string            `yaml:"base_path"`
+	Backend storage.Config `yaml:"backend"`
+	Server  server.Config  `yaml:"server"`
 }
 
 func parseConfig(path string) (*config, error) {
