@@ -1,6 +1,7 @@
 package doomsday
 
 import (
+	"crypto/x509/pkix"
 	"regexp"
 	"strings"
 	"sync"
@@ -123,5 +124,6 @@ func (k PathList) Except(filter PathFilter) (ret PathList) {
 }
 
 type CacheObject struct {
+	Subject  pkix.Name
 	NotAfter time.Time
 }

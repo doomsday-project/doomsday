@@ -32,7 +32,12 @@ func (b *Core) PopulateUsing(paths PathList) error {
 		for k, v := range secret {
 			cert := parseCert(v)
 			if cert != nil {
-				b.Cache.Store(fmt.Sprintf("%s:%s", path, k), CacheObject{NotAfter: cert.NotAfter})
+				b.Cache.Store(fmt.Sprintf("%s:%s", path, k),
+					CacheObject{
+						Subject:  cert.Subject,
+						NotAfter: cert.NotAfter,
+					},
+				)
 			}
 		}
 	}
