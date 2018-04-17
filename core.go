@@ -29,16 +29,20 @@ func (b *Core) PopulateUsing(paths PathList) error {
 		if err != nil {
 			return err
 		}
-		for k, v := range secret {
+		for _, v := range secret {
 			cert := parseCert(v)
 			if cert != nil {
-				b.Cache.Store(fmt.Sprintf("%s:%s", path, k),
+				b.Cache.Store(path,
 					CacheObject{
 						Subject:  cert.Subject,
 						NotAfter: cert.NotAfter,
 					},
 				)
+				//Don't get multiple certs from within the same secret - they're probably
+				// the same one
+				break
 			}
+
 		}
 	}
 	return nil
