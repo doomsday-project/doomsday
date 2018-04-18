@@ -1,41 +1,74 @@
 package server
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
+	"github.com/cloudfoundry-community/vaultkv"
 	"github.com/gorilla/mux"
 	"github.com/thomasmmitchell/doomsday"
+	"github.com/thomasmmitchell/doomsday/storage"
 )
-
-type Config struct {
-	Port    int    `yaml:"port"`
-	LogFile string `yaml:"logfile"`
-	Auth    struct {
-		Type   string            `yaml:"type"`
-		Config map[string]string `yaml:"config"`
-	} `yaml:"auth"`
-}
 
 type server struct {
 	Core *doomsday.Core
 }
 
-func Start(conf Config, core *doomsday.Core) error {
+//TODO: Refactor this into helper functions
+func Start(conf Config) error {
 	var err error
 	logWriter := os.Stderr
-	if conf.LogFile != "" {
-		logWriter, err = os.OpenFile(conf.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if conf.Server.LogFile != "" {
+		logWriter, err = os.OpenFile(conf.Server.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return fmt.Errorf("Could not open log file for writing: %s", err)
 		}
 	}
 
 	fmt.Fprintf(logWriter, "Initializing server\n")
+
+	var backend storage.Accessor
+	switch strings.ToLower(conf.Backend.Type) {
+	case "vault":
+		u, err := url.Parse(conf.Backend.Address)
+		if err != nil {
+			return fmt.Errorf("Could not parse url (%s) in config: %s", u, err)
+		}
+
+		backend = &storage.VaultAccessor{
+			Client: &vaultkv.Client{
+				VaultURL:  u,
+				AuthToken: conf.Backend.Auth["token"],
+				Client: &http.Client{
+					Transport: &http.Transport{
+						TLSClientConfig: &tls.Config{
+							InsecureSkipVerify: true,
+						},
+					},
+				},
+				//Trace: os.Stdout,
+			},
+		}
+
+		if conf.Backend.BasePath == "" {
+			conf.Backend.BasePath = "secret"
+		}
+	default:
+		return fmt.Errorf("Unrecognized backend type (%s)", conf.Backend.Type)
+	}
+
+	core := &doomsday.Core{
+		Backend:  backend,
+		BasePath: conf.Backend.BasePath,
+		Cache:    doomsday.NewCache(),
+	}
 
 	populate := func() {
 		err := core.Populate()
@@ -57,19 +90,19 @@ func Start(conf Config, core *doomsday.Core) error {
 
 	var shouldNotAuth bool
 	var authHandler http.Handler
-	switch conf.Auth.Type {
+	switch conf.Server.Auth.Type {
 	case "":
 		shouldNotAuth = true
 	case "userpass":
-		authHandler, err = newUserpassAuth(conf.Auth.Config)
+		authHandler, err = newUserpassAuth(conf.Server.Auth.Config)
 	default:
-		err = fmt.Errorf("Unrecognized auth type `%s'", conf.Auth.Type)
+		err = fmt.Errorf("Unrecognized auth type `%s'", conf.Server.Auth.Type)
 	}
 	if err != nil {
 		return fmt.Errorf("Error setting up auth: %s", err)
 	}
 
-	fmt.Fprintf(logWriter, "Auth configured with type `%s'\n", conf.Auth.Type)
+	fmt.Fprintf(logWriter, "Auth configured with type `%s'\n", conf.Server.Auth.Type)
 
 	var auth authorizer
 	router := mux.NewRouter()
@@ -82,8 +115,8 @@ func Start(conf Config, core *doomsday.Core) error {
 	router.HandleFunc("/v1/cache", auth(getCache(core))).Methods("GET")
 	router.HandleFunc("/v1/cache/refresh", auth(refreshCache(core))).Methods("POST")
 
-	fmt.Fprintf(logWriter, "Beginning listening on port %d\n", conf.Port)
-	return http.ListenAndServe(fmt.Sprintf(":%d", conf.Port), router)
+	fmt.Fprintf(logWriter, "Beginning listening on port %d\n", conf.Server.Port)
+	return http.ListenAndServe(fmt.Sprintf(":%d", conf.Server.Port), router)
 }
 
 func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) {
