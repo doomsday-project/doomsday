@@ -1,65 +1,31 @@
 package main
 
 import (
-	"crypto/tls"
 	"fmt"
-	"net/http"
-	"net/url"
 	"os"
-	"strings"
 
-	"github.com/cloudfoundry-community/vaultkv"
 	"github.com/starkandwayne/goutils/ansi"
-	"github.com/thomasmmitchell/doomsday"
-	"github.com/thomasmmitchell/doomsday/server"
-	"github.com/thomasmmitchell/doomsday/storage"
+	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
 
-//var app = kingpin.New("doomsday", "Cert expiration tracker")
+func registerCommands(app *kingpin.Application) {
+	serverCom := app.Command("server", "Start the doomsday server")
+	cmdIndex["server"] = &serverCmd{
+		configPath: serverCom.Flag("config", "The path to the config file").
+			Short('c').
+			Default("ddayconfig.yml").String(),
+	}
+}
 
 func main() {
-	conf, err := parseConfig("ddayconfig.yml")
+	var app = kingpin.New("doomsday", "Cert expiration tracker")
+	registerCommands(app)
+
+	commandName := kingpin.MustParse(app.Parse(os.Args[1:]))
+	err := cmdIndex[commandName].Run()
 	if err != nil {
 		bailWith(err.Error())
 	}
-
-	var backend storage.Accessor
-
-	switch strings.ToLower(conf.Backend.Type) {
-	case "vault":
-		u, err := url.Parse(conf.Backend.Address)
-		if err != nil {
-			bailWith("Could not parse url (%s) in config: %s", u, err)
-		}
-		backend = &storage.VaultAccessor{
-			Client: &vaultkv.Client{
-				VaultURL:  u,
-				AuthToken: conf.Backend.Auth["token"],
-				Client: &http.Client{
-					Transport: &http.Transport{
-						TLSClientConfig: &tls.Config{
-							InsecureSkipVerify: true,
-						},
-					},
-				},
-				//Trace: os.Stdout,
-			},
-		}
-
-		if conf.Backend.BasePath == "" {
-			conf.Backend.BasePath = "secret"
-		}
-
-	default:
-		bailWith("Unrecognized backend type (%s)", conf.Backend.Type)
-	}
-
-	core := &doomsday.Core{
-		Backend:  backend,
-		BasePath: conf.Backend.BasePath,
-		Cache:    doomsday.NewCache(),
-	}
-	server.Start(conf.Server, core)
 }
 
 func bailWith(f string, a ...interface{}) {
