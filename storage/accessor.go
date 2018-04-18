@@ -8,6 +8,6 @@ type Config struct {
 }
 
 type Accessor interface {
-	List(path string) ([]string, error)
+	List(path string) (PathList, error)
 	Get(path string) (map[string]string, error)
 }

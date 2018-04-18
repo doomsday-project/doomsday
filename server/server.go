@@ -119,6 +119,6 @@ func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) 
 func refreshCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		go core.Populate()
-		w.WriteHeader(200)
+		w.WriteHeader(204)
 	}
 }

@@ -3,8 +3,6 @@ package doomsday
 import (
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
-	"strings"
 
 	"github.com/thomasmmitchell/doomsday/storage"
 )
@@ -23,7 +21,7 @@ func (b *Core) Populate() error {
 	return b.PopulateUsing(paths)
 }
 
-func (b *Core) PopulateUsing(paths PathList) error {
+func (b *Core) PopulateUsing(paths storage.PathList) error {
 	for _, path := range paths {
 		secret, err := b.Backend.Get(path)
 		if err != nil {
@@ -48,35 +46,13 @@ func (b *Core) PopulateUsing(paths PathList) error {
 	return nil
 }
 
-func (b *Core) Paths() (PathList, error) {
-	paths, err := b.recursivelyList(b.BasePath)
+func (b *Core) Paths() (storage.PathList, error) {
+	paths, err := b.Backend.List(b.BasePath)
 	if err != nil {
 		return nil, err
 	}
 
 	return paths, nil
-}
-
-func (b *Core) recursivelyList(path string) (PathList, error) {
-	var leaves []string
-	list, err := b.Backend.List(path)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, v := range list {
-		if !strings.HasSuffix(v, "/") {
-			leaves = append(leaves, canonizePath(fmt.Sprintf("%s/%s", path, v)))
-		} else {
-			rList, err := b.recursivelyList(canonizePath(fmt.Sprintf("%s/%s", path, v)))
-			if err != nil {
-				return nil, err
-			}
-			leaves = append(leaves, rList...)
-		}
-	}
-
-	return leaves, nil
 }
 
 func parseCert(c string) *x509.Certificate {
@@ -91,15 +67,4 @@ func parseCert(c string) *x509.Certificate {
 	}
 
 	return cert
-}
-
-func canonizePath(path string) string {
-	pathChunks := strings.Split(path, "/")
-	for i := 0; i < len(pathChunks); i++ {
-		if pathChunks[i] == "" {
-			pathChunks = append(pathChunks[:i], pathChunks[i+1:]...)
-			i--
-		}
-	}
-	return strings.Join(pathChunks, "/")
 }

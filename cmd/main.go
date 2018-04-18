@@ -15,6 +15,8 @@ import (
 	"github.com/thomasmmitchell/doomsday/storage"
 )
 
+//var app = kingpin.New("doomsday", "Cert expiration tracker")
+
 func main() {
 	conf, err := parseConfig("ddayconfig.yml")
 	if err != nil {
