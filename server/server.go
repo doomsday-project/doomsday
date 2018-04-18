@@ -110,6 +110,7 @@ func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) 
 		if err != nil {
 			w.WriteHeader(500)
 		} else {
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(200)
 			w.Write(resp)
 		}
