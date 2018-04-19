@@ -117,9 +117,10 @@ func Start(conf Config) error {
 	}
 
 	core := &doomsday.Core{
-		Backend:  backend,
-		BasePath: conf.Backend.BasePath,
-		Cache:    doomsday.NewCache(),
+		Backend:     backend,
+		BasePath:    conf.Backend.BasePath,
+		Cache:       doomsday.NewCache(),
+		BackendName: conf.Backend.Name,
 	}
 
 	populate := func() {
@@ -174,18 +175,20 @@ func Start(conf Config) error {
 func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type item struct {
-			Path       string `json:"path"`
-			CommonName string `json:"common_name"`
-			NotAfter   int64  `json:"not_after"`
+			BackendName string `json:"backend_name"`
+			Path        string `json:"path"`
+			CommonName  string `json:"common_name"`
+			NotAfter    int64  `json:"not_after"`
 		}
 
 		data := core.Cache.Map()
 		items := make([]item, 0, len(data))
 		for k, v := range data {
 			items = append(items, item{
-				Path:       k,
-				CommonName: v.Subject.CommonName,
-				NotAfter:   v.NotAfter.Unix(),
+				Path:        k,
+				CommonName:  v.Subject.CommonName,
+				NotAfter:    v.NotAfter.Unix(),
+				BackendName: v.BackendName,
 			})
 		}
 

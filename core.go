@@ -9,9 +9,10 @@ import (
 )
 
 type Core struct {
-	Backend  storage.Accessor
-	Cache    *Cache
-	BasePath string
+	Backend     storage.Accessor
+	Cache       *Cache
+	BasePath    string
+	BackendName string
 }
 
 func (b *Core) Populate() error {
@@ -33,8 +34,9 @@ func (b *Core) PopulateUsing(paths storage.PathList) error {
 			if cert != nil {
 				b.Cache.Store(path,
 					CacheObject{
-						Subject:  cert.Subject,
-						NotAfter: cert.NotAfter,
+						Subject:     cert.Subject,
+						NotAfter:    cert.NotAfter,
+						BackendName: b.BackendName,
 					},
 				)
 				//Don't get multiple certs from within the same secret - they're probably

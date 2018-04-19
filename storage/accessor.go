@@ -6,6 +6,7 @@ type Config struct {
 	InsecureSkipVerify bool              `yaml:"insecure_skip_verify"`
 	Auth               map[string]string `yaml:"auth"`
 	BasePath           string            `yaml:"base_path"`
+	Name               string            `yaml:"name"`
 }
 
 type Accessor interface {
