@@ -5,11 +5,11 @@ import (
 )
 
 type serverCmd struct {
-	configPath *string
+	ManifestPath *string
 }
 
 func (s *serverCmd) Run() error {
-	conf, err := server.ParseConfig(*s.configPath)
+	conf, err := server.ParseConfig(*configPath)
 	if err != nil {
 		return err
 	}

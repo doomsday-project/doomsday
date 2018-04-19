@@ -5,8 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/ghodss/yaml"
 	"github.com/thomasmmitchell/doomsday/storage"
+	yaml "gopkg.in/yaml.v2"
 )
 
 type Config struct {
