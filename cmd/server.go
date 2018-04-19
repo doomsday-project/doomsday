@@ -9,7 +9,7 @@ type serverCmd struct {
 }
 
 func (s *serverCmd) Run() error {
-	conf, err := server.ParseConfig(*configPath)
+	conf, err := server.ParseConfig(*s.ManifestPath)
 	if err != nil {
 		return err
 	}

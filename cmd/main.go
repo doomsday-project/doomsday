@@ -1,10 +1,14 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/starkandwayne/goutils/ansi"
+	"github.com/thomasmmitchell/doomsday"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -26,11 +30,22 @@ func registerCommands(app *kingpin.Application) {
 
 	_ = app.Command("targets", "Print out configured targets")
 	cmdIndex["targets"] = &targetsCmd{}
+
+	loginCom := app.Command("login", "Auth to the doomsday server").Alias("auth")
+	cmdIndex["login"] = &loginCmd{
+		Username: loginCom.Flag("username", "The username to log in as").
+			Short('u').String(),
+		Password: loginCom.Flag("password", "The password to log in with").
+			Short('p').String(),
+	}
+	cmdIndex["auth"] = cmdIndex["login"]
+
 }
 
 var app = kingpin.New("doomsday", "Cert expiration tracker")
 var cliConf *CLIConfig
 var target *CLITarget
+var client *doomsday.Client
 
 func main() {
 	registerCommands(app)
@@ -59,6 +74,23 @@ func main() {
 		target = cliConf.CurrentTarget()
 		if target == nil {
 			bailWith("No doomsday server is currently targeted")
+		}
+
+		u, err := url.Parse(target.Address)
+		if err != nil {
+			bailWith("Could not parse target address as URL")
+		}
+
+		client = &doomsday.Client{
+			URL:   *u,
+			Token: target.Token,
+			Client: &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: target.SkipVerify,
+					},
+				},
+			},
 		}
 	}
 

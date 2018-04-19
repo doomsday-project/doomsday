@@ -38,7 +38,7 @@ func (c *CLIConfig) SetCurrent(name string) error {
 }
 
 func (c *CLIConfig) Add(target CLITarget) error {
-	if c.Find(target.Name) != nil {
+	for c.Find(target.Name) != nil {
 		c.Delete(target.Name)
 	}
 
@@ -50,7 +50,7 @@ func (c *CLIConfig) Delete(name string) {
 	for i, target := range c.Targets {
 		if target.Name == name {
 			c.Targets[i], c.Targets[len(c.Targets)-1] = c.Targets[len(c.Targets)-1], c.Targets[i]
-			c.Targets = c.Targets[:len(c.Targets)]
+			c.Targets = c.Targets[:len(c.Targets)-1]
 			break
 		}
 	}
