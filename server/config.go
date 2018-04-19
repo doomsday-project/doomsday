@@ -38,5 +38,7 @@ func ParseConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("Could not parse config (%s) as YAML: %s", path, err)
 	}
 
+	conf.Backend.InsecureSkipVerify = true
+
 	return &conf, nil
 }

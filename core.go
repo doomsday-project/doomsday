@@ -3,6 +3,7 @@ package doomsday
 import (
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 
 	"github.com/thomasmmitchell/doomsday/storage"
 )
@@ -43,6 +44,7 @@ func (b *Core) PopulateUsing(paths storage.PathList) error {
 
 		}
 	}
+	fmt.Printf("Finished populating credentials\n")
 	return nil
 }
 

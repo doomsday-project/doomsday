@@ -1,9 +1,11 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,6 +17,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/thomasmmitchell/doomsday"
 	"github.com/thomasmmitchell/doomsday/storage"
+	"golang.org/x/oauth2"
 )
 
 type server struct {
@@ -49,7 +52,7 @@ func Start(conf Config) error {
 				Client: &http.Client{
 					Transport: &http.Transport{
 						TLSClientConfig: &tls.Config{
-							InsecureSkipVerify: true,
+							InsecureSkipVerify: conf.Backend.InsecureSkipVerify,
 						},
 					},
 				},
@@ -59,6 +62,55 @@ func Start(conf Config) error {
 
 		if conf.Backend.BasePath == "" {
 			conf.Backend.BasePath = "secret"
+		}
+	case "opsmgr":
+		u, err := url.Parse(conf.Backend.Address)
+		if err != nil {
+			return fmt.Errorf("Could not parse url (%s) in config: %s", u, err)
+		}
+
+		config := &oauth2.Config{
+			ClientID:     "opsman",
+			ClientSecret: "",
+			Endpoint: oauth2.Endpoint{
+				TokenURL: "https://10.213.9.1/uaa/oauth/token",
+			},
+		}
+
+		httpclient := &http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: conf.Backend.InsecureSkipVerify,
+				},
+				Dial: (&net.Dialer{
+					Timeout:   5 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).Dial,
+			},
+		}
+
+		ctx := context.Background()
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, httpclient)
+
+		token, err := config.PasswordCredentialsToken(ctx, conf.Backend.Auth["username"], conf.Backend.Auth["password"])
+		if err != nil {
+			return fmt.Errorf("token could not be retrieved from target url: %s", err)
+		}
+
+		url, err := url.Parse(conf.Backend.Address)
+		if err != nil {
+			return fmt.Errorf("could not parse target url: %s", err)
+		}
+
+		if url.Scheme == "" {
+			url.Scheme = "https"
+		}
+
+		backend = &storage.OmAccessor{
+			Client: config.Client(ctx, token),
+			Host:   url.Host,
+			Scheme: url.Scheme,
 		}
 	default:
 		return fmt.Errorf("Unrecognized backend type (%s)", conf.Backend.Type)
