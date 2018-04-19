@@ -1,9 +1,11 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,6 +17,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/thomasmmitchell/doomsday"
 	"github.com/thomasmmitchell/doomsday/storage"
+	"golang.org/x/oauth2"
 )
 
 type server struct {
@@ -55,6 +58,48 @@ func Start(conf Config) error {
 				},
 				//Trace: os.Stdout,
 			},
+		}
+
+		if conf.Backend.BasePath == "" {
+			conf.Backend.BasePath = "secret"
+		}
+	case "opsmgr":
+		u, err := url.Parse(conf.Backend.Address)
+		if err != nil {
+			return fmt.Errorf("Could not parse url (%s) in config: %s", u, err)
+		}
+
+		config := &oauth2.Config{
+			ClientID:     "opsman",
+			ClientSecret: "",
+			Endpoint: oauth2.Endpoint{
+				TokenURL: "https://10.213.9.1/uaa/oauth/token",
+			},
+		}
+
+		httpclient := &http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true, //fixme
+				},
+				Dial: (&net.Dialer{
+					Timeout:   5 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).Dial,
+			},
+		}
+
+		ctx := context.Background()
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, httpclient)
+
+		token, err := config.PasswordCredentialsToken(ctx, "admin", "password") //fixme
+		if err != nil {
+			return fmt.Errorf("token could not be retrieved from target url: %s", err)
+		}
+
+		backend = &storage.OmAccessor{
+			Client: config.Client(ctx, token),
 		}
 
 		if conf.Backend.BasePath == "" {
