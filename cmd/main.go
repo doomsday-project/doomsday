@@ -23,6 +23,9 @@ func registerCommands(app *kingpin.Application) {
 		SkipVerify: targetCom.Flag("insecure-skip-verify", "Skip TLS cert validation for this backend").
 			Short('k').Bool(),
 	}
+
+	_ = app.Command("targets", "Print out configured targets")
+	cmdIndex["targets"] = &targetsCmd{}
 }
 
 var app = kingpin.New("doomsday", "Cert expiration tracker")
