@@ -40,6 +40,8 @@ func registerCommands(app *kingpin.Application) {
 	}
 	cmdIndex["auth"] = cmdIndex["login"]
 
+	_ = app.Command("list", "List the contents of the server cache")
+	cmdIndex["list"] = &listCmd{}
 }
 
 var app = kingpin.New("doomsday", "Cert expiration tracker")

@@ -174,17 +174,11 @@ func Start(conf Config) error {
 
 func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		type item struct {
-			BackendName string `json:"backend_name"`
-			Path        string `json:"path"`
-			CommonName  string `json:"common_name"`
-			NotAfter    int64  `json:"not_after"`
-		}
 
 		data := core.Cache.Map()
-		items := make([]item, 0, len(data))
+		items := make([]doomsday.CacheItem, 0, len(data))
 		for k, v := range data {
-			items = append(items, item{
+			items = append(items, doomsday.CacheItem{
 				Path:        k,
 				CommonName:  v.Subject.CommonName,
 				NotAfter:    v.NotAfter.Unix(),

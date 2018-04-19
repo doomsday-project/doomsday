@@ -36,6 +36,7 @@ func (c *Client) doRequest(
 	if err != nil {
 		return err
 	}
+	req.Header.Set("X-Doomsday-Token", c.Token)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -60,7 +61,7 @@ func (c *Client) doRequest(
 	return nil
 }
 
-//UserpassAuth Attempts to authenticate with the doomsday server. If successful,
+//UserpassAuth attempts to authenticate with the doomsday server. If successful,
 // the response is stored into the client
 func (c *Client) UserpassAuth(username, password string) error {
 	output := struct {
@@ -74,4 +75,18 @@ func (c *Client) UserpassAuth(username, password string) error {
 
 	c.Token = output.Token
 	return err
+}
+
+type CacheItem struct {
+	BackendName string `json:"backend_name"`
+	Path        string `json:"path"`
+	CommonName  string `json:"common_name"`
+	NotAfter    int64  `json:"not_after"`
+}
+
+//GetCache gets the cache list
+func (c *Client) GetCache() ([]CacheItem, error) {
+	ret := []CacheItem{}
+	err := c.doRequest("GET", "/v1/cache", nil, &ret)
+	return ret, err
 }
