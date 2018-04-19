@@ -9,8 +9,9 @@ import (
 )
 
 type OmAccessor struct {
-	Client   *http.Client
-	BasePath string
+	Client *http.Client
+	Host   string
+	Scheme string
 }
 
 //Get attempts to get the secret stored at the requested backend path and
@@ -23,26 +24,7 @@ func (v *OmAccessor) Get(path string) (map[string]string, error) {
 		} `json:"credential"`
 	}
 
-	req, err := http.NewRequest("GET", path, nil)
-	if err != nil {
-		return credentials.Cred.Value, err
-	}
-
-	req.URL.Scheme = "https" //fixme
-	req.URL.Host = "10.213.9.1"
-
-	resp, err := v.Client.Do(req)
-	if err != nil {
-		return map[string]string{}, fmt.Errorf("could not make api request to credentials endpoint: %s", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		_, err := httputil.DumpResponse(resp, true)
-		return map[string]string{}, err
-	}
-
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := v.opsmanAPI(path)
 	if err != nil {
 		return map[string]string{}, err
 	}
@@ -56,45 +38,87 @@ func (v *OmAccessor) Get(path string) (map[string]string, error) {
 
 //List attempts to list the paths directly under the given path
 func (v *OmAccessor) List(path string) (PathList, error) {
-	deployedGUID := "cf-32403a409e48e697b084" //fixme!
-	path = fmt.Sprintf("/api/v0/deployed/products/%s/credentials", deployedGUID)
-	req, err := http.NewRequest("GET", path, nil)
+	var finalPaths []string
+	deployments, err := v.getDeployments()
 	if err != nil {
 		return []string{}, err
 	}
 
-	req.URL.Scheme = "https" //fixme
-	req.URL.Host = "10.213.9.1"
+	for _, deployment := range deployments {
+		path = fmt.Sprintf("/api/v0/deployed/products/%s/credentials", deployment)
+
+		var credentialReferences struct {
+			Credentials []string `json:"credentials"`
+		}
+
+		respBody, err := v.opsmanAPI(path)
+		if err != nil {
+			return []string{}, err
+		}
+
+		err = json.Unmarshal(respBody, &credentialReferences)
+		if err != nil {
+			return []string{}, fmt.Errorf("could not unmarshal credentials response: %s", err)
+		}
+
+		for _, cred := range credentialReferences.Credentials {
+			finalPaths = append(finalPaths, fmt.Sprintf("/api/v0/deployed/products/%s/credentials/%s", deployment, cred))
+		}
+	}
+
+	return finalPaths, nil
+}
+
+func (v *OmAccessor) getDeployments() ([]string, error) {
+	path := fmt.Sprintf("/api/v0/deployed/products")
+	respBody, err := v.opsmanAPI(path)
+	if err != nil {
+		return []string{}, err
+	}
+	var rawDeployments []struct {
+		InstallationName string `json:"installation_name"`
+		GUID             string `json:"guid"`
+		Type             string `json:"type"`
+		ProductVersion   string `json:"product_version"`
+	}
+
+	err = json.Unmarshal(respBody, &rawDeployments)
+	if err != nil {
+		return []string{}, fmt.Errorf("could not unmarshal credentials response: %s", err)
+	}
+
+	var deployments []string
+	for _, deployment := range rawDeployments {
+		deployments = append(deployments, deployment.GUID)
+	}
+
+	return deployments, nil
+}
+
+func (v *OmAccessor) opsmanAPI(path string) ([]byte, error) {
+	req, err := http.NewRequest("GET", path, nil)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	req.URL.Scheme = v.Scheme
+	req.URL.Host = v.Host
 
 	resp, err := v.Client.Do(req)
 	if err != nil {
-		return []string{}, fmt.Errorf("could not make api request to credentials endpoint: %s", err)
+		return []byte{}, fmt.Errorf("could not make api request to credentials endpoint: %s", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		_, err := httputil.DumpResponse(resp, true)
-		return []string{}, err
+		return []byte{}, err
 	}
 
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return []string{}, err
+		return []byte{}, err
 	}
 
-	var credentialReferences struct {
-		Credentials []string `json:"credentials"`
-	}
-
-	err = json.Unmarshal(respBody, &credentialReferences)
-	if err != nil {
-		return []string{}, fmt.Errorf("could not unmarshal credentials response: %s", err)
-	}
-
-	var finalPaths []string
-	for _, cred := range credentialReferences.Credentials {
-		finalPaths = append(finalPaths, fmt.Sprintf("/api/v0/deployed/products/%s/credentials/%s", deployedGUID, cred))
-	}
-
-	return finalPaths, nil
+	return respBody, nil
 }
