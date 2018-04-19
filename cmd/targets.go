@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"strings"
+	"os"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/starkandwayne/goutils/ansi"
 )
 
@@ -11,15 +12,25 @@ type targetsCmd struct {
 }
 
 func (t *targetsCmd) Run() error {
-	toPrint := make([]string, 0, len(cliConf.Targets))
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Name", "Address", "Skip Verify"})
 	for _, target := range cliConf.Targets {
+		name := target.Name
 		if target.Name == cliConf.Current {
-			toPrint = append(toPrint, target.String())
-		} else {
-			toPrint = append(toPrint, ansi.Sprintf("@G{%s}", target.String()))
+			name = ansi.Sprintf("@G{%s}", target.Name)
 		}
+
+		skipVerify := fmt.Sprintf("%t", target.SkipVerify)
+		if target.SkipVerify {
+			skipVerify = ansi.Sprintf("@R{%s}", skipVerify)
+		}
+
+		table.Append([]string{name, target.Address, skipVerify})
 	}
 
-	fmt.Println(strings.Join(toPrint, "===\n"))
+	table.SetBorder(false)
+	fmt.Println("")
+	table.Render()
+	fmt.Println("")
 	return nil
 }

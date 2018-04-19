@@ -24,7 +24,7 @@ func registerCommands(app *kingpin.Application) {
 	cmdIndex["target"] = &targetCmd{
 		Name:    targetCom.Arg("name", "The name of the target").String(),
 		Address: targetCom.Arg("address", "The address to set for this target").String(),
-		SkipVerify: targetCom.Flag("insecure-skip-verify", "Skip TLS cert validation for this backend").
+		SkipVerify: targetCom.Flag("insecure", "Skip TLS cert validation for this backend").
 			Short('k').Bool(),
 	}
 
