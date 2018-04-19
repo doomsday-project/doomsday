@@ -35,6 +35,8 @@ var target *CLITarget
 func main() {
 	registerCommands(app)
 
+	app.HelpFlag.Short('h')
+
 	commandName := kingpin.MustParse(app.Parse(os.Args[1:]))
 	cmd, found := cmdIndex[commandName]
 	if !found {
