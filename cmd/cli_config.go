@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
+
+	"github.com/olekukonko/tablewriter"
+	"github.com/starkandwayne/goutils/ansi"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -64,10 +68,18 @@ type CLITarget struct {
 }
 
 func (c *CLITarget) String() string {
-	return fmt.Sprintf(`Name: %s
-Address: %s
-SkipVerify: %t
-`, c.Name, c.Address, c.SkipVerify)
+	buf := bytes.NewBuffer([]byte("\n"))
+	table := tablewriter.NewWriter(buf)
+	table.Append([]string{"Name", c.Name})
+	table.Append([]string{"Address", c.Address})
+	skipVerify := fmt.Sprintf("%t", c.SkipVerify)
+	if c.SkipVerify {
+		skipVerify = ansi.Sprintf("@R{%t}", c.SkipVerify)
+	}
+	table.Append([]string{"Skip Verify", skipVerify})
+	table.SetRowLine(true)
+	table.Render()
+	return buf.String()
 }
 
 func loadConfig(path string) (*CLIConfig, error) {
