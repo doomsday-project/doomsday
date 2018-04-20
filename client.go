@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type Client struct {
@@ -87,9 +88,37 @@ type CacheItem struct {
 	NotAfter    int64  `json:"not_after"`
 }
 
+type CacheItems []CacheItem
+type CacheItemFilter struct {
+	Beyond *time.Duration
+	Within *time.Duration
+}
+
+func (c *CacheItems) Filter(filter CacheItemFilter) {
+	if filter.Beyond != nil {
+		cutoff := time.Now().Add(*filter.Beyond)
+		for i, v := range *c {
+			if cutoff.Before(time.Unix(v.NotAfter, 0)) {
+				*c = (*c)[i:]
+				break
+			}
+		}
+	}
+
+	if filter.Within != nil {
+		cutoff := time.Now().Add(*filter.Within)
+		for i, v := range *c {
+			if cutoff.Before(time.Unix(v.NotAfter, 0)) {
+				*c = (*c)[:i]
+				break
+			}
+		}
+	}
+}
+
 //GetCache gets the cache list
-func (c *Client) GetCache() ([]CacheItem, error) {
-	ret := []CacheItem{}
+func (c *Client) GetCache() (CacheItems, error) {
+	ret := CacheItems{}
 	err := c.doRequest("GET", "/v1/cache", nil, &ret)
 	return ret, err
 }

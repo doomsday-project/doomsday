@@ -40,8 +40,13 @@ func registerCommands(app *kingpin.Application) {
 	}
 	cmdIndex["auth"] = cmdIndex["login"]
 
-	_ = app.Command("list", "List the contents of the server cache")
-	cmdIndex["list"] = &listCmd{}
+	listCom := app.Command("list", "List the contents of the server cache")
+	cmdIndex["list"] = &listCmd{
+		Beyond: listCom.Flag("beyond", "Restrict to certs that expire in longer than the given duration").
+			Short('b').PlaceHolder("1y2d3h4m").String(),
+		Within: listCom.Flag("within", "Restrict to certs that expire in less than the given duration").
+			Short('w').PlaceHolder("1y2d3h4m").String(),
+	}
 
 	_ = app.Command("refresh", "Refresh the servers cache")
 	cmdIndex["refresh"] = &refreshCmd{}
