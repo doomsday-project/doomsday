@@ -43,13 +43,16 @@ func (c *Client) doRequest(
 		return err
 	}
 	defer resp.Body.Close()
+
+	//TODO: Set up tracer
 	//dump, err := httputil.DumpResponse(resp, true)
 	//if err != nil {
 	//	return err
 	//}
 	//fmt.Println(string(dump))
+
 	if (resp.StatusCode / 100) != 2 {
-		return fmt.Errorf("Returned non-200 response code")
+		return fmt.Errorf("Returned non-2xx response code")
 	}
 
 	if output != nil {
@@ -89,4 +92,9 @@ func (c *Client) GetCache() ([]CacheItem, error) {
 	ret := []CacheItem{}
 	err := c.doRequest("GET", "/v1/cache", nil, &ret)
 	return ret, err
+}
+
+//RefreshCache makes a request to asynchronously refresh the server cache
+func (c *Client) RefreshCache() error {
+	return c.doRequest("POST", "/v1/cache/refresh", nil, nil)
 }
