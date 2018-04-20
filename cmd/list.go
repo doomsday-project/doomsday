@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
@@ -18,6 +19,7 @@ func (s *listCmd) Run() error {
 		return err
 	}
 
+	fmt.Println("")
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Common Name", "Expires In", "Path"})
 	for _, result := range results {
@@ -25,7 +27,7 @@ func (s *listCmd) Run() error {
 
 		expStr := ansi.Sprintf("@R{EXPIRED}")
 		if expiresIn > 0 {
-			expStr = fmt.Sprintf("%dh%dm", int(expiresIn.Hours()), int(expiresIn.Minutes()))
+			expStr = formatDuration(expiresIn)
 		}
 		table.Append([]string{
 			result.CommonName,
@@ -38,4 +40,22 @@ func (s *listCmd) Run() error {
 	table.Render()
 
 	return nil
+}
+
+func formatDuration(dur time.Duration) string {
+	retSlice := []string{}
+	if dur >= time.Hour*24*365 {
+		retSlice = append(retSlice, ansi.Sprintf("%dy", dur/(time.Hour*24*365)))
+	}
+
+	if dur >= time.Hour*24 {
+		retSlice = append(retSlice, ansi.Sprintf("%dd", int64((dur.Hours())/24)%365))
+	}
+
+	if dur >= time.Hour {
+		retSlice = append(retSlice, ansi.Sprintf("%dh", int64(dur.Hours())%24))
+	}
+
+	retSlice = append(retSlice, ansi.Sprintf("%dm", int64(dur.Minutes())%60))
+	return strings.Join(retSlice, " ")
 }
