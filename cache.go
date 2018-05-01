@@ -51,7 +51,6 @@ func (c *Cache) Map() map[string]CacheObject {
 }
 
 type CacheObject struct {
-	Subject     pkix.Name
-	NotAfter    time.Time
-	BackendName string
+	Subject  pkix.Name
+	NotAfter time.Time
 }

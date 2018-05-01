@@ -117,10 +117,9 @@ func Start(conf Config) error {
 	}
 
 	core := &doomsday.Core{
-		Backend:     backend,
-		BasePath:    conf.Backend.BasePath,
-		Cache:       doomsday.NewCache(),
-		BackendName: conf.Backend.Name,
+		Backend:  backend,
+		BasePath: conf.Backend.BasePath,
+		Cache:    doomsday.NewCache(),
 	}
 
 	populate := func() {
@@ -179,10 +178,9 @@ func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) 
 		items := make([]doomsday.CacheItem, 0, len(data))
 		for k, v := range data {
 			items = append(items, doomsday.CacheItem{
-				Path:        k,
-				CommonName:  v.Subject.CommonName,
-				NotAfter:    v.NotAfter.Unix(),
-				BackendName: v.BackendName,
+				Path:       k,
+				CommonName: v.Subject.CommonName,
+				NotAfter:   v.NotAfter.Unix(),
 			})
 		}
 

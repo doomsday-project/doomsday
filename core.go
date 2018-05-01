@@ -35,9 +35,8 @@ func (b *Core) PopulateUsing(paths storage.PathList) error {
 			if cert != nil {
 				b.Cache.Store(path,
 					CacheObject{
-						Subject:     cert.Subject,
-						NotAfter:    cert.NotAfter,
-						BackendName: b.BackendName,
+						Subject:  cert.Subject,
+						NotAfter: cert.NotAfter,
 					},
 				)
 				//Don't get multiple certs from within the same secret - they're probably
