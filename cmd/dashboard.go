@@ -70,7 +70,7 @@ func (d *dashboardCmd) Run() error {
 		Within: &within1WeekBound,
 	})
 
-	if len(within24Hours) > 0 {
+	if len(within1Week) > 0 {
 		header := tablewriter.NewWriter(os.Stdout)
 		header.SetHeader([]string{"1 WEEK"})
 		header.SetHeaderColor(tablewriter.Colors{
