@@ -18,6 +18,8 @@ func init() {
 //GLOBALS
 var (
 	configPath = app.Flag("config", "Path to the config file").
-		Short('c').
-		Default(fmt.Sprintf("%s/.dday", os.Getenv("HOME"))).String()
+			Short('c').
+			Default(fmt.Sprintf("%s/.dday", os.Getenv("HOME"))).String()
+	trace = app.Flag("trace", "Show HTTP trace").
+		Short('T').Bool()
 )

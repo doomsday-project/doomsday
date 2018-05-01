@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"time"
 )
@@ -14,6 +15,7 @@ type Client struct {
 	Client *http.Client
 	URL    url.URL
 	Token  string
+	Trace  io.Writer
 }
 
 func (c *Client) doRequest(
@@ -39,18 +41,33 @@ func (c *Client) doRequest(
 	}
 	req.Header.Set("X-Doomsday-Token", c.Token)
 
+	if c.Trace != nil {
+		dump, err := httputil.DumpRequest(req, true)
+		if err != nil {
+			return err
+		}
+		_, err = c.Trace.Write(dump)
+		if err != nil {
+			return err
+		}
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	//TODO: Set up tracer
-	//dump, err := httputil.DumpResponse(resp, true)
-	//if err != nil {
-	//	return err
-	//}
-	//fmt.Println(string(dump))
+	if c.Trace != nil {
+		dump, err := httputil.DumpResponse(resp, true)
+		if err != nil {
+			return err
+		}
+		_, err = c.Trace.Write(dump)
+		if err != nil {
+			return err
+		}
+	}
 
 	if (resp.StatusCode / 100) != 2 {
 		return fmt.Errorf("Returned non-2xx response code")
@@ -94,12 +111,17 @@ type CacheItemFilter struct {
 	Within *time.Duration
 }
 
-func (c *CacheItems) Filter(filter CacheItemFilter) {
+func (c CacheItems) Filter(filter CacheItemFilter) CacheItems {
+	ret := make(CacheItems, 0, len(c))
+	for _, v := range c {
+		ret = append(ret, v)
+	}
+
 	if filter.Beyond != nil {
 		cutoff := time.Now().Add(*filter.Beyond)
-		for i, v := range *c {
+		for i, v := range ret {
 			if cutoff.Before(time.Unix(v.NotAfter, 0)) {
-				*c = (*c)[i:]
+				ret = ret[i:]
 				break
 			}
 		}
@@ -107,13 +129,15 @@ func (c *CacheItems) Filter(filter CacheItemFilter) {
 
 	if filter.Within != nil {
 		cutoff := time.Now().Add(*filter.Within)
-		for i, v := range *c {
+		for i, v := range ret {
 			if cutoff.Before(time.Unix(v.NotAfter, 0)) {
-				*c = (*c)[:i]
+				ret = ret[:i]
 				break
 			}
 		}
 	}
+
+	return ret
 }
 
 //GetCache gets the cache list

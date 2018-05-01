@@ -24,6 +24,7 @@ func (b *Core) Populate() error {
 }
 
 func (b *Core) PopulateUsing(paths storage.PathList) error {
+	fmt.Println("Began populating credentials")
 	for _, path := range paths {
 		secret, err := b.Backend.Get(path)
 		if err != nil {
@@ -46,7 +47,7 @@ func (b *Core) PopulateUsing(paths storage.PathList) error {
 
 		}
 	}
-	fmt.Printf("Finished populating credentials\n")
+	fmt.Println("Finished populating credentials")
 	return nil
 }
 

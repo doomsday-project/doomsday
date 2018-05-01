@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -48,6 +49,10 @@ func registerCommands(app *kingpin.Application) {
 			Short('w').PlaceHolder("1y2d3h4m").String(),
 	}
 
+	_ = app.Command("dashboard", "See your impending doom").Alias("dash")
+	cmdIndex["dashboard"] = &dashboardCmd{}
+	cmdIndex["dash"] = cmdIndex["dashboard"]
+
 	_ = app.Command("refresh", "Refresh the servers cache")
 	cmdIndex["refresh"] = &refreshCmd{}
 }
@@ -91,6 +96,11 @@ func main() {
 			bailWith("Could not parse target address as URL")
 		}
 
+		var traceWriter io.Writer
+		if trace != nil && *trace {
+			traceWriter = os.Stderr
+		}
+
 		client = &doomsday.Client{
 			URL:   *u,
 			Token: target.Token,
@@ -101,6 +111,7 @@ func main() {
 					},
 				},
 			},
+			Trace: traceWriter,
 		}
 	}
 

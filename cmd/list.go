@@ -44,13 +44,19 @@ func (s *listCmd) Run() error {
 		filter.Within = &dur
 	}
 
-	results.Filter(filter)
+	results = results.Filter(filter)
 
 	//Printing
 	fmt.Println("")
+	printList(results)
+
+	return nil
+}
+
+func printList(items doomsday.CacheItems) {
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Common Name", "Expires In", "Path"})
-	for _, result := range results {
+	for _, result := range items {
 		expiresIn := time.Until(time.Unix(result.NotAfter, 0))
 
 		expStr := ansi.Sprintf("@R{EXPIRED}")
@@ -66,8 +72,6 @@ func (s *listCmd) Run() error {
 	table.SetBorder(false)
 	table.SetRowLine(true)
 	table.Render()
-
-	return nil
 }
 
 func formatDuration(dur time.Duration) string {
