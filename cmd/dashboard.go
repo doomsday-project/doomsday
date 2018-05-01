@@ -18,11 +18,6 @@ func (d *dashboardCmd) Run() error {
 		return err
 	}
 
-	if len(results) == 0 {
-		fmt.Println("Nothing is expiring soon")
-		return nil
-	}
-
 	expiredBound := time.Duration(0)
 	expired := results.Filter(doomsday.CacheItemFilter{
 		Within: &expiredBound,
@@ -107,6 +102,14 @@ func (d *dashboardCmd) Run() error {
 		header.Render()
 
 		printList(within4Weeks)
+	}
+
+	withinDash := results.Filter(doomsday.CacheItemFilter{
+		Within: &within4WeeksBound,
+	})
+
+	if len(withinDash) == 0 {
+		fmt.Println("Could not find any certs which expire soon")
 	}
 
 	return nil
