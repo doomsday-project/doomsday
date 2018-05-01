@@ -64,7 +64,8 @@ var client *doomsday.Client
 
 func main() {
 	registerCommands(app)
-
+	app.Version(doomsday.Version)
+	app.VersionFlag.Short('v')
 	app.HelpFlag.Short('h')
 
 	commandName := kingpin.MustParse(app.Parse(os.Args[1:]))
