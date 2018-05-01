@@ -26,4 +26,4 @@ linux:
 all: darwin linux
 
 clean:
-	rm -f doomsday doomsday-darwin doomsday-linux
+	rm -f $(APP_NAME) $(APP_NAME)-darwin $(APP_NAME)-linux
