@@ -4,15 +4,28 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"sync"
 
 	"github.com/thomasmmitchell/doomsday/storage"
 )
 
 type Core struct {
 	Backend     storage.Accessor
-	Cache       *Cache
+	cache       *Cache
+	cacheLock   sync.RWMutex
 	BasePath    string
 	BackendName string
+}
+
+func (b *Core) SetCache(c *Cache) {
+	b.cacheLock.Lock()
+	defer b.cacheLock.Unlock()
+	c.lock = &b.cacheLock
+	b.cache = c
+}
+
+func (b *Core) Cache() *Cache {
+	return b.cache
 }
 
 func (b *Core) Populate() error {
@@ -25,15 +38,17 @@ func (b *Core) Populate() error {
 
 func (b *Core) PopulateUsing(paths storage.PathList) error {
 	fmt.Println("Began populating credentials")
+	newCache := NewCache()
 	for _, path := range paths {
 		secret, err := b.Backend.Get(path)
 		if err != nil {
 			return err
 		}
+
 		for _, v := range secret {
 			cert := parseCert(v)
 			if cert != nil {
-				b.Cache.Store(path,
+				newCache.Store(path,
 					CacheObject{
 						Subject:  cert.Subject,
 						NotAfter: cert.NotAfter,
@@ -46,6 +61,8 @@ func (b *Core) PopulateUsing(paths storage.PathList) error {
 
 		}
 	}
+
+	b.SetCache(newCache)
 	fmt.Println("Finished populating credentials")
 	return nil
 }

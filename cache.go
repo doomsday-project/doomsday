@@ -9,7 +9,7 @@ import (
 //Cache stores all the certificate data.
 type Cache struct {
 	store map[string]CacheObject
-	lock  sync.RWMutex
+	lock  *sync.RWMutex
 }
 
 func NewCache() *Cache {
@@ -35,8 +35,6 @@ func (c *Cache) Read(path string) (CacheObject, bool) {
 }
 
 func (c *Cache) Store(path string, value CacheObject) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	c.store[path] = value
 }
 

@@ -119,8 +119,9 @@ func Start(conf Config) error {
 	core := &doomsday.Core{
 		Backend:  backend,
 		BasePath: conf.Backend.BasePath,
-		Cache:    doomsday.NewCache(),
 	}
+
+	core.SetCache(doomsday.NewCache())
 
 	populate := func() {
 		err := core.Populate()
@@ -174,7 +175,7 @@ func Start(conf Config) error {
 func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		data := core.Cache.Map()
+		data := core.Cache().Map()
 		items := make([]doomsday.CacheItem, 0, len(data))
 		for k, v := range data {
 			items = append(items, doomsday.CacheItem{
