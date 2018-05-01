@@ -44,15 +44,15 @@ func (d *dashboardCmd) Run() error {
 		t.Render()
 	}
 
-	within24HoursBound := time.Duration(time.Hour * 24)
-	within24Hours := results.Filter(doomsday.CacheItemFilter{
+	within3DaysBound := time.Duration(time.Hour * 24 * 3)
+	within3Days := results.Filter(doomsday.CacheItemFilter{
 		Beyond: &expiredBound,
-		Within: &within24HoursBound,
+		Within: &within3DaysBound,
 	})
 
-	if len(within24Hours) > 0 {
+	if len(within3Days) > 0 {
 		header := tablewriter.NewWriter(os.Stdout)
-		header.SetHeader([]string{"24 HOURS"})
+		header.SetHeader([]string{"3 DAYS"})
 		header.SetHeaderColor(tablewriter.Colors{
 			tablewriter.Bold,
 			tablewriter.BgBlackColor,
@@ -61,18 +61,18 @@ func (d *dashboardCmd) Run() error {
 		header.SetHeaderLine(false)
 		header.Render()
 
-		printList(within24Hours)
+		printList(within3Days)
 	}
 
-	within1WeekBound := time.Duration(time.Hour * 24 * 7)
-	within1Week := results.Filter(doomsday.CacheItemFilter{
-		Beyond: &within24HoursBound,
-		Within: &within1WeekBound,
+	within2WeeksBound := time.Duration(time.Hour * 24 * 7 * 2)
+	within2Weeks := results.Filter(doomsday.CacheItemFilter{
+		Beyond: &within3DaysBound,
+		Within: &within2WeeksBound,
 	})
 
-	if len(within1Week) > 0 {
+	if len(within2Weeks) > 0 {
 		header := tablewriter.NewWriter(os.Stdout)
-		header.SetHeader([]string{"1 WEEK"})
+		header.SetHeader([]string{"2 WEEKS"})
 		header.SetHeaderColor(tablewriter.Colors{
 			tablewriter.Bold,
 			tablewriter.BgBlackColor,
@@ -81,12 +81,12 @@ func (d *dashboardCmd) Run() error {
 		header.SetHeaderLine(false)
 		header.Render()
 
-		printList(within1Week)
+		printList(within2Weeks)
 	}
 
 	within4WeeksBound := time.Duration(time.Hour * 24 * 7 * 4)
 	within4Weeks := results.Filter(doomsday.CacheItemFilter{
-		Beyond: &within1WeekBound,
+		Beyond: &within2WeeksBound,
 		Within: &within4WeeksBound,
 	})
 
