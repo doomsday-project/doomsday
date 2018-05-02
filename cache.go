@@ -13,7 +13,10 @@ type Cache struct {
 }
 
 func NewCache() *Cache {
-	return &Cache{store: map[string]CacheObject{}}
+	return &Cache{
+		store: map[string]CacheObject{},
+		lock:  &sync.RWMutex{}, //Lock for writing while the cache is being populated
+	}
 }
 
 //Keys returns a list of all of the keys in the cache
@@ -35,6 +38,8 @@ func (c *Cache) Read(path string) (CacheObject, bool) {
 }
 
 func (c *Cache) Store(path string, value CacheObject) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	c.store[path] = value
 }
 

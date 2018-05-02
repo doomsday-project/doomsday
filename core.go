@@ -38,26 +38,57 @@ func (b *Core) Populate() error {
 func (b *Core) PopulateUsing(paths storage.PathList) error {
 	fmt.Println("Began populating credentials")
 	newCache := NewCache()
-	for _, path := range paths {
-		secret, err := b.Backend.Get(path)
-		if err != nil {
-			return err
-		}
 
-		for _, v := range secret {
-			cert := parseCert(v)
-			if cert != nil {
-				newCache.Store(path,
-					CacheObject{
-						Subject:  cert.Subject,
-						NotAfter: cert.NotAfter,
-					},
-				)
-				//Don't get multiple certs from within the same secret - they're probably
-				// the same one
-				break
+	const numWorkers = 4
+
+	queue := make(chan string, len(paths))
+	for _, path := range paths {
+		queue <- path
+	}
+	close(queue)
+
+	doneChan := make(chan bool, numWorkers)
+	errChan := make(chan error, numWorkers)
+
+	fetch := func() {
+		for path := range queue {
+			secret, err := b.Backend.Get(path)
+			if err != nil {
+				errChan <- err
 			}
 
+			for _, v := range secret {
+				cert := parseCert(v)
+				if cert != nil {
+					newCache.Store(path,
+						CacheObject{
+							Subject:  cert.Subject,
+							NotAfter: cert.NotAfter,
+						},
+					)
+					//Don't get multiple certs from within the same secret - they're probably
+					// the same one
+					break
+				}
+			}
+		}
+		doneChan <- true
+	}
+
+	for i := 0; i < numWorkers; i++ {
+		go fetch()
+	}
+
+	numDone := 0
+	for {
+		select {
+		case <-doneChan:
+			numDone++
+			if numDone == numWorkers {
+				return nil
+			}
+		case err := <-errChan:
+			return err
 		}
 	}
 

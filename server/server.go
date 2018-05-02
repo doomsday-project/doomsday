@@ -52,10 +52,12 @@ func Start(conf Config) error {
 	core.SetCache(doomsday.NewCache())
 
 	populate := func() {
+		startedAt := time.Now()
 		err := core.Populate()
 		if err != nil {
 			fmt.Fprintf(logWriter, "%s: Error populating cache: %s\n", time.Now(), err)
 		}
+		fmt.Printf("Populate took %s\n", time.Since(startedAt))
 	}
 
 	go func() {
