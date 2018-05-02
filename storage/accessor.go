@@ -5,10 +5,10 @@ type Config struct {
 	Address            string            `yaml:"address"`
 	InsecureSkipVerify bool              `yaml:"insecure_skip_verify"`
 	Auth               map[string]string `yaml:"auth"`
-	BasePath           string            `yaml:"base_path"`
+	Config             map[string]string `yaml:"config"`
 }
 
 type Accessor interface {
-	List(path string) (PathList, error)
+	List() (PathList, error)
 	Get(path string) (map[string]string, error)
 }

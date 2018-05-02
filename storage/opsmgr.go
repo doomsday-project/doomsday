@@ -1,17 +1,69 @@
 package storage
 
 import (
+	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
+	"time"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 )
 
 type OmAccessor struct {
 	Client *http.Client
 	Host   string
 	Scheme string
+}
+
+func NewOmAccessor(conf *Config) (*OmAccessor, error) {
+	u, err := url.Parse(conf.Address)
+	if err != nil {
+		return nil, fmt.Errorf("Could not parse url (%s) in config: %s", u, err)
+	}
+
+	config := &clientcredentials.Config{
+		ClientID:     conf.Auth["client_id"],
+		ClientSecret: conf.Auth["client_secret"],
+		TokenURL:     conf.Auth["oauth_endpoint"],
+	}
+
+	httpclient := &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: conf.InsecureSkipVerify,
+			},
+			Dial: (&net.Dialer{
+				Timeout:   5 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+		},
+	}
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, httpclient)
+
+	url, err := url.Parse(conf.Address)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse target url: %s", err)
+	}
+
+	if url.Scheme == "" {
+		url.Scheme = "https"
+	}
+
+	return &OmAccessor{
+		Client: config.Client(ctx),
+		Host:   url.Host,
+		Scheme: url.Scheme,
+	}, nil
 }
 
 //Get attempts to get the secret stored at the requested backend path and
@@ -37,7 +89,7 @@ func (v *OmAccessor) Get(path string) (map[string]string, error) {
 }
 
 //List attempts to list the paths directly under the given path
-func (v *OmAccessor) List(path string) (PathList, error) {
+func (v *OmAccessor) List() (PathList, error) {
 	var finalPaths []string
 	deployments, err := v.getDeployments()
 	if err != nil {
@@ -45,7 +97,7 @@ func (v *OmAccessor) List(path string) (PathList, error) {
 	}
 
 	for _, deployment := range deployments {
-		path = fmt.Sprintf("/api/v0/deployed/products/%s/credentials", deployment)
+		path := fmt.Sprintf("/api/v0/deployed/products/%s/credentials", deployment)
 
 		var credentialReferences struct {
 			Credentials []string `json:"credentials"`

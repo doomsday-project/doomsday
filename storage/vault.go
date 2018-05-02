@@ -1,7 +1,10 @@
 package storage
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/cloudfoundry-community/vaultkv"
@@ -12,6 +15,35 @@ type VaultAccessor struct {
 	BasePath string
 }
 
+func NewVaultAccessor(conf *Config) (*VaultAccessor, error) {
+	u, err := url.Parse(conf.Address)
+	if err != nil {
+		return nil, fmt.Errorf("Could not parse url (%s) in config: %s", u, err)
+	}
+
+	basePath := "secret/"
+	if confBasePath, found := conf.Config["base_path"]; found {
+		basePath = fmt.Sprintf("%s/", confBasePath)
+	}
+
+	return &VaultAccessor{
+		Client: &vaultkv.Client{
+			VaultURL:  u,
+			AuthToken: conf.Auth["token"],
+			Client: &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: conf.InsecureSkipVerify,
+					},
+				},
+			},
+			//Trace: os.Stdout,
+		},
+		BasePath: basePath,
+	}, nil
+
+}
+
 //Get attempts to get the secret stored at the requested backend path and
 // return it as a map.
 func (v *VaultAccessor) Get(path string) (map[string]string, error) {
@@ -20,8 +52,12 @@ func (v *VaultAccessor) Get(path string) (map[string]string, error) {
 	return ret, err
 }
 
-//List attempts to list the paths directly under the given path
-func (v *VaultAccessor) List(path string) (PathList, error) {
+//List attempts to list all the paths under the given path
+func (v *VaultAccessor) List() (PathList, error) {
+	return v.list(v.BasePath)
+}
+
+func (v *VaultAccessor) list(path string) (PathList, error) {
 	var leaves []string
 	list, err := v.Client.List(path)
 	if err != nil {
@@ -32,7 +68,7 @@ func (v *VaultAccessor) List(path string) (PathList, error) {
 		if !strings.HasSuffix(val, "/") {
 			leaves = append(leaves, canonizePath(fmt.Sprintf("%s/%s", path, val)))
 		} else {
-			rList, err := v.List(canonizePath(fmt.Sprintf("%s/%s", path, val)))
+			rList, err := v.list(canonizePath(fmt.Sprintf("%s/%s", path, val)))
 			if err != nil {
 				return nil, err
 			}

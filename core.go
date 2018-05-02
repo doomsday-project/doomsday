@@ -13,7 +13,6 @@ type Core struct {
 	Backend     storage.Accessor
 	cache       *Cache
 	cacheLock   sync.RWMutex
-	BasePath    string
 	BackendName string
 }
 
@@ -68,7 +67,7 @@ func (b *Core) PopulateUsing(paths storage.PathList) error {
 }
 
 func (b *Core) Paths() (storage.PathList, error) {
-	paths, err := b.Backend.List(b.BasePath)
+	paths, err := b.Backend.List()
 	if err != nil {
 		return nil, err
 	}
