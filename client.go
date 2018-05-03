@@ -70,7 +70,7 @@ func (c *Client) doRequest(
 	}
 
 	if (resp.StatusCode / 100) != 2 {
-		return fmt.Errorf("Returned non-2xx response code")
+		return parseError(resp.StatusCode)
 	}
 
 	if output != nil {

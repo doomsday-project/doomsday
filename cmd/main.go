@@ -118,6 +118,9 @@ func main() {
 
 	err := cmd.Run()
 	if err != nil {
+		if _, is401 := err.(*doomsday.ErrUnauthorized); is401 {
+			err = fmt.Errorf("Not authenticated. Please log in with `doomsday login'")
+		}
 		bailWith(err.Error())
 	}
 
