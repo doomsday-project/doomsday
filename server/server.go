@@ -117,7 +117,7 @@ func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) 
 
 		sort.Slice(items, func(i, j int) bool { return items[i].NotAfter < items[j].NotAfter })
 
-		resp, err := json.Marshal(&items)
+		resp, err := json.Marshal(&doomsday.GetCacheResponse{Content: items})
 		if err != nil {
 			w.WriteHeader(500)
 		} else {

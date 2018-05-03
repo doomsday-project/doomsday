@@ -140,11 +140,15 @@ func (c CacheItems) Filter(filter CacheItemFilter) CacheItems {
 	return ret
 }
 
+type GetCacheResponse struct {
+	Content CacheItems `json:"content"`
+}
+
 //GetCache gets the cache list
 func (c *Client) GetCache() (CacheItems, error) {
-	ret := CacheItems{}
-	err := c.doRequest("GET", "/v1/cache", nil, &ret)
-	return ret, err
+	resp := GetCacheResponse{}
+	err := c.doRequest("GET", "/v1/cache", nil, &resp)
+	return resp.Content, err
 }
 
 //RefreshCache makes a request to asynchronously refresh the server cache
