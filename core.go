@@ -79,17 +79,22 @@ func (b *Core) PopulateUsing(paths storage.PathList) error {
 		go fetch()
 	}
 
+	var err error
 	numDone := 0
 	for {
 		select {
 		case <-doneChan:
 			numDone++
 			if numDone == numWorkers {
-				return nil
+				goto doneWaiting
 			}
-		case err := <-errChan:
-			return err
+		case err = <-errChan:
+			goto doneWaiting
 		}
+	}
+doneWaiting:
+	if err != nil {
+		return err
 	}
 
 	b.SetCache(newCache)
