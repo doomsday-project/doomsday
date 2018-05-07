@@ -18,8 +18,7 @@ import (
 
 type OmAccessor struct {
 	Client *http.Client
-	Host   string
-	Scheme string
+	URL    *url.URL
 }
 
 func newOmClient(conf *Config) *http.Client {
@@ -63,8 +62,7 @@ func NewOmAccessor(conf *Config) (*OmAccessor, error) {
 
 	return &OmAccessor{
 		Client: client,
-		Host:   u.Host,
-		Scheme: u.Scheme,
+		URL:    u,
 	}, nil
 }
 
@@ -191,13 +189,13 @@ func (v *OmAccessor) getDeployments() ([]string, error) {
 }
 
 func (v *OmAccessor) opsmanAPI(path string) ([]byte, error) {
-	req, err := http.NewRequest("GET", path, nil)
+	u := *v.URL
+	u.Path = fmt.Sprintf("%s%s", u.Path, path)
+
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return []byte{}, err
 	}
-
-	req.URL.Scheme = v.Scheme
-	req.URL.Host = v.Host
 
 	resp, err := v.Client.Do(req)
 	if err != nil {
@@ -206,8 +204,9 @@ func (v *OmAccessor) opsmanAPI(path string) ([]byte, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		reqDump, _ := httputil.DumpRequest(req, true)
 		respDump, _ := httputil.DumpResponse(resp, true)
-		return []byte{}, fmt.Errorf("%s", respDump)
+		return []byte{}, fmt.Errorf("%s\n\n%s", reqDump, respDump)
 	}
 
 	respBody, err := ioutil.ReadAll(resp.Body)
