@@ -22,19 +22,8 @@ type OmAccessor struct {
 	Scheme string
 }
 
-func NewOmAccessor(conf *Config) (*OmAccessor, error) {
-	u, err := url.Parse(conf.Address)
-	if err != nil {
-		return nil, fmt.Errorf("Could not parse url (%s) in config: %s", u, err)
-	}
-
-	config := &clientcredentials.Config{
-		ClientID:     conf.Auth["client_id"],
-		ClientSecret: conf.Auth["client_secret"],
-		TokenURL:     conf.Auth["oauth_endpoint"],
-	}
-
-	httpclient := &http.Client{
+func newOmClient(conf *Config) *http.Client {
+	return &http.Client{
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			TLSClientConfig: &tls.Config{
@@ -46,31 +35,78 @@ func NewOmAccessor(conf *Config) (*OmAccessor, error) {
 			}).Dial,
 		},
 	}
+}
 
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, httpclient)
+func NewOmAccessor(conf *Config) (*OmAccessor, error) {
+	var client *http.Client
+	var err error
 
-	url, err := url.Parse(conf.Address)
+	switch conf.Auth["grant_type"] {
+	case "client_credentials", "client credentials", "clientcredentials":
+		client, err = newClientCredentials(conf)
+	case "resource_owner", "resource owner", "resourceowner", "password":
+		client, err = newResourceOwner(conf)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := url.Parse(conf.Address)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse target url: %s", err)
 	}
 
-	if url.Scheme == "" {
-		url.Scheme = "https"
-	}
-
-	//This isn't necessary for the flow, but it let's us check if the ops manager
-	// configuration is wrong ahead of time
-	_, err = config.Token(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("Could not retrieve token for ops manager: %s", err)
+	if u.Scheme == "" {
+		u.Scheme = "https"
 	}
 
 	return &OmAccessor{
-		Client: config.Client(ctx),
-		Host:   url.Host,
-		Scheme: url.Scheme,
+		Client: client,
+		Host:   u.Host,
+		Scheme: u.Scheme,
 	}, nil
+}
+
+func newClientCredentials(conf *Config) (*http.Client, error) {
+	config := &clientcredentials.Config{
+		ClientID:     conf.Auth["client_id"],
+		ClientSecret: conf.Auth["client_secret"],
+		TokenURL:     fmt.Sprintf("%s/uaa/oauth/token", conf.Address),
+	}
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, newOmClient(conf))
+
+	//This isn't necessary for the flow, but it let's us check if the ops manager
+	// configuration is wrong ahead of time
+	_, err := config.Token(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("Error fetching token with client_credentials grant: %s", err)
+	}
+
+	return config.Client(ctx), nil
+}
+
+func newResourceOwner(conf *Config) (*http.Client, error) {
+	config := &oauth2.Config{
+		ClientID:     conf.Auth["client_id"],
+		ClientSecret: conf.Auth["client_secret"],
+		Endpoint: oauth2.Endpoint{
+			TokenURL: fmt.Sprintf("%s/uaa/oauth/token", conf.Address),
+			AuthURL:  fmt.Sprintf("%s/uaa/oauth/authorize", conf.Address),
+		},
+	}
+
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, newOmClient(conf))
+
+	token, err := config.PasswordCredentialsToken(ctx, conf.Auth["username"], conf.Auth["password"])
+	if err != nil {
+		return nil, fmt.Errorf("Error fetching token with password grant: %s", err)
+	}
+
+	return config.Client(ctx, token), nil
 }
 
 //Get attempts to get the secret stored at the requested backend path and
@@ -170,8 +206,8 @@ func (v *OmAccessor) opsmanAPI(path string) ([]byte, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		_, err := httputil.DumpResponse(resp, true)
-		return []byte{}, err
+		respDump, _ := httputil.DumpResponse(resp, true)
+		return []byte{}, fmt.Errorf("%s", respDump)
 	}
 
 	respBody, err := ioutil.ReadAll(resp.Body)
