@@ -59,6 +59,13 @@ func NewOmAccessor(conf *Config) (*OmAccessor, error) {
 		url.Scheme = "https"
 	}
 
+	//This isn't necessary for the flow, but it let's us check if the ops manager
+	// configuration is wrong ahead of time
+	_, err = config.Token(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("Could not retrieve token for ops manager: %s", err)
+	}
+
 	return &OmAccessor{
 		Client: config.Client(ctx),
 		Host:   url.Host,
@@ -110,7 +117,7 @@ func (v *OmAccessor) List() (PathList, error) {
 
 		err = json.Unmarshal(respBody, &credentialReferences)
 		if err != nil {
-			return []string{}, fmt.Errorf("could not unmarshal credentials response: %s", err)
+			return []string{}, fmt.Errorf("could not unmarshal credentials response: %s\nresponse: `%s`", err, respBody)
 		}
 
 		for _, cred := range credentialReferences.Credentials {
@@ -136,7 +143,7 @@ func (v *OmAccessor) getDeployments() ([]string, error) {
 
 	err = json.Unmarshal(respBody, &rawDeployments)
 	if err != nil {
-		return []string{}, fmt.Errorf("could not unmarshal credentials response: %s", err)
+		return []string{}, fmt.Errorf("could not unmarshal credentials response: %s\nresponse: `%s`", err, respBody)
 	}
 
 	var deployments []string
