@@ -52,7 +52,7 @@ func (v *VaultAccessor) Get(path string) (map[string]string, error) {
 	return ret, err
 }
 
-//List attempts to list all the paths under the given path
+//List attempts to list all the paths under the configured base path
 func (v *VaultAccessor) List() (PathList, error) {
 	return v.list(v.BasePath)
 }

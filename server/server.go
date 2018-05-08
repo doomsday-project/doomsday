@@ -35,8 +35,10 @@ func Start(conf Config) error {
 	switch strings.ToLower(conf.Backend.Type) {
 	case "vault":
 		backend, err = storage.NewVaultAccessor(&conf.Backend)
-	case "opsmgr":
+	case "opsmgr", "ops manager", "opsman", "opsmanager":
 		backend, err = storage.NewOmAccessor(&conf.Backend)
+	case "credhub", "configserver", "config server":
+		backend, err = storage.NewConfigServer(&conf.Backend)
 	default:
 		err = fmt.Errorf("Unrecognized backend type (%s)", conf.Backend.Type)
 	}

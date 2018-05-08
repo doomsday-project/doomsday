@@ -129,7 +129,7 @@ func (v *OmAccessor) Get(path string) (map[string]string, error) {
 	return credentials.Cred.Value, nil
 }
 
-//List attempts to list the paths directly under the given path
+//List attempts to list the paths in the ops manager that could have certs
 func (v *OmAccessor) List() (PathList, error) {
 	var finalPaths []string
 	deployments, err := v.getDeployments()

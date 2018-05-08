@@ -28,10 +28,13 @@ func (b *Core) Cache() *Cache {
 }
 
 func (b *Core) Populate() error {
+	fmt.Printf("Enumerating possible paths\n")
 	paths, err := b.Paths()
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("Found %d paths to look up\n", len(paths))
 	return b.PopulateUsing(paths)
 }
 
