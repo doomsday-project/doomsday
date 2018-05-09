@@ -8,7 +8,7 @@ Create a configuration manifest and start the server against it with
 The manifest should be written in YAML, and the schema looks like this:
 
 `backend.type`: _(string, enum)_ Which kind of storage backend containing your
-certs that the server should target. Currently only supports `vault`
+certs that the server should target. Currently supports `vault`, `opsman`, or `credhub`.
 
 `backend.address`: _(string)_ Where the storage backend's API is located
 
@@ -17,11 +17,38 @@ storage backend's CA cert.
 
 `backend.auth`: _(hash)_ A backend specific authentication configuration.
 
-&nbsp;&nbsp;&nbsp;&nbsp;
-**For `vault` backends:**
+`backend.config`: _(hash)_ Additional configuration
+specific to a backend
+
+### For `vault` storage backends
 
 &nbsp;&nbsp;&nbsp;&nbsp;
 `backend.auth.token`: _(string)_ The authentication token to be used
+
+`backend.config.base_path`: _(string)_ The root of the
+secret tree to begin searching from. Defaults to `secret`.
+
+### For `opsman` or `credhub` storage backends
+
+&nbsp;&nbsp;&nbsp;&nbsp;
+`backend.auth.grant_type`: _(string,enum)_ The type of oauth grant to
+ perform to the backend. One of `client_credentials` or `password`
+
+&nbsp;&nbsp;&nbsp;&nbsp;
+`backend.auth.client_id`: _(string)_ The client id for the oauth
+client to authenticate as.
+
+&nbsp;&nbsp;&nbsp;&nbsp;
+`backend.auth.client_secret`: _(string)_ The client secret for the
+oauth client to authenticate as.
+
+&nbsp;&nbsp;&nbsp;&nbsp;
+`backend.auth.username`: _(string)_ The username to authenticate as.
+Only required if using the `password` grant type.
+
+&nbsp;&nbsp;&nbsp;&nbsp;
+`backend.auth.password`: _(string)_ The password for the user to
+ authenticate with. Only required if using the `password` grant type.
 
 `server.port`: _(int)_ The port that the doomsday server API listens on
 
