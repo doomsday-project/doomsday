@@ -2,9 +2,12 @@ package storage
 
 import (
 	"fmt"
+	"net/http"
+	"sync"
+	"time"
 
 	"github.com/cloudfoundry-incubator/credhub-cli/credhub"
-	"github.com/cloudfoundry-incubator/credhub-cli/credhub/auth"
+	"github.com/thomasmmitchell/doomsday/storage/uaa"
 )
 
 type ConfigServerAccessor struct {
@@ -13,16 +16,42 @@ type ConfigServerAccessor struct {
 
 func NewConfigServer(conf *Config) (*ConfigServerAccessor, error) {
 	var err error
-	authStrat := auth.Noop
+	var authResp *uaa.AuthResponse
+
+	c, err := credhub.New(
+		conf.Address,
+		credhub.SkipTLSValidation(conf.InsecureSkipVerify),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("Could not create config server client: %s", err)
+	}
+
+	authURL, err := c.AuthURL()
+	if err != nil {
+		return nil, fmt.Errorf("Could not get auth endpoint: %s", err)
+	}
+
+	fmt.Printf("AuthURL: %s\n", authURL)
+
+	uaaClient := uaa.Client{
+		URL:               authURL,
+		SkipTLSValidation: conf.InsecureSkipVerify,
+	}
+
+	var isClientCredentials bool
+
 	switch conf.Auth["grant_type"] {
 	case "client_credentials", "client credentials", "clientcredentials":
-		authStrat = auth.UaaClientCredentials(
+		fmt.Println("Performing client credentials grant auth")
+		isClientCredentials = true
+		authResp, err = uaaClient.ClientCredentials(
 			conf.Auth["client_id"],
 			conf.Auth["client_secret"],
 		)
 
 	case "resource_owner", "resource owner", "resourceowner", "password":
-		authStrat = auth.UaaPassword(
+		fmt.Println("Performing password grant auth")
+		authResp, err = uaaClient.Password(
 			conf.Auth["client_id"],
 			conf.Auth["client_secret"],
 			conf.Auth["username"],
@@ -33,24 +62,35 @@ func NewConfigServer(conf *Config) (*ConfigServerAccessor, error) {
 	default:
 		err = fmt.Errorf("Unknown auth grant_type `%s'", conf.Auth["grant_type"])
 	}
-
 	if err != nil {
 		return nil, err
 	}
 
-	c, err := credhub.New(
+	fmt.Println("Auth complete")
+
+	c, err = credhub.New(
 		conf.Address,
 		credhub.SkipTLSValidation(conf.InsecureSkipVerify),
-		credhub.Auth(authStrat),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("Could not create config server client: %s", err)
+
+	c.Auth = &refreshTokenStrategy{
+		ClientID:            conf.Auth["client_id"],
+		ClientSecret:        conf.Auth["client_secret"],
+		UAAClient:           &uaaClient,
+		APIClient:           c.Client(),
+		IsClientCredentials: isClientCredentials,
 	}
 
-	err = c.Auth.(*auth.OAuthStrategy).Login()
-	if err != nil {
-		return nil, fmt.Errorf("Could not authenticate with given credentials: %s", err)
-	}
+	c.Auth.(*refreshTokenStrategy).SetTokens(authResp.AccessToken, authResp.RefreshToken)
+
+	go func() {
+		for range time.Tick(authResp.TTL / 2) {
+			err = c.Auth.(*refreshTokenStrategy).Refresh()
+			if err != nil {
+				fmt.Printf("Could not refresh token: %s", err)
+			}
+		}
+	}()
 
 	return &ConfigServerAccessor{Credhub: c}, nil
 }
@@ -83,4 +123,57 @@ func (v *ConfigServerAccessor) Get(path string) (map[string]string, error) {
 	}
 
 	return nil, nil
+}
+
+type refreshTokenStrategy struct {
+	lock                sync.RWMutex
+	accessToken         string
+	refreshToken        string
+	ClientID            string
+	ClientSecret        string
+	IsClientCredentials bool
+	UAAClient           *uaa.Client
+	APIClient           *http.Client
+}
+
+func (r *refreshTokenStrategy) Do(req *http.Request) (*http.Response, error) {
+	req.Header.Set("Authorization", "Bearer "+r.AccessToken())
+	return r.APIClient.Do(req)
+}
+
+func (r *refreshTokenStrategy) AccessToken() string {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+	return r.accessToken
+}
+
+func (r *refreshTokenStrategy) RefreshToken() string {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+	return r.refreshToken
+}
+
+func (r *refreshTokenStrategy) Refresh() error {
+	var authResp *uaa.AuthResponse
+	var err error
+	if r.IsClientCredentials {
+		authResp, err = r.UAAClient.ClientCredentials(r.ClientID, r.ClientSecret)
+	} else {
+		authResp, err = r.UAAClient.Refresh(r.ClientID, r.ClientSecret, r.RefreshToken())
+	}
+
+	if err != nil {
+		return err
+	}
+
+	r.SetTokens(authResp.AccessToken, authResp.RefreshToken)
+
+	return nil
+}
+
+func (r *refreshTokenStrategy) SetTokens(accessToken, refreshToken string) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.accessToken = accessToken
+	r.refreshToken = refreshToken
 }
