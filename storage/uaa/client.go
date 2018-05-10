@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -21,6 +22,10 @@ func (c *Client) client() *http.Client {
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: c.SkipTLSValidation,
 			},
+			Dial: (&net.Dialer{
+				Timeout:   5 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
 		},
 	}
 }

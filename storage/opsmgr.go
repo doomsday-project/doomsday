@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -10,15 +9,22 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"sync"
 	"time"
 
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/clientcredentials"
+	"github.com/thomasmmitchell/doomsday/storage/uaa"
 )
 
 type OmAccessor struct {
-	Client *http.Client
-	URL    *url.URL
+	Client              *http.Client
+	uaaClient           *uaa.Client
+	URL                 *url.URL
+	lock                sync.RWMutex
+	clientID            string
+	clientSecret        string
+	accessToken         string
+	refreshToken        string
+	isClientCredentials bool
 }
 
 func newOmClient(conf *Config) *http.Client {
@@ -37,20 +43,6 @@ func newOmClient(conf *Config) *http.Client {
 }
 
 func NewOmAccessor(conf *Config) (*OmAccessor, error) {
-	var client *http.Client
-	var err error
-
-	switch conf.Auth["grant_type"] {
-	case "client_credentials", "client credentials", "clientcredentials":
-		client, err = newClientCredentials(conf)
-	case "resource_owner", "resource owner", "resourceowner", "password":
-		client, err = newResourceOwner(conf)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
 	u, err := url.Parse(conf.Address)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse target url: %s", err)
@@ -60,51 +52,55 @@ func NewOmAccessor(conf *Config) (*OmAccessor, error) {
 		u.Scheme = "https"
 	}
 
-	return &OmAccessor{
-		Client: client,
-		URL:    u,
-	}, nil
-}
-
-func newClientCredentials(conf *Config) (*http.Client, error) {
-	config := &clientcredentials.Config{
-		ClientID:     conf.Auth["client_id"],
-		ClientSecret: conf.Auth["client_secret"],
-		TokenURL:     fmt.Sprintf("%s/uaa/oauth/token", conf.Address),
+	var client = newOmClient(conf)
+	var authResp *uaa.AuthResponse
+	var uaaClient = &uaa.Client{
+		URL:               fmt.Sprintf("%s/uaa/oauth/token", u.String()),
+		SkipTLSValidation: conf.InsecureSkipVerify,
 	}
 
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, newOmClient(conf))
+	var isClientCredentials bool
 
-	//This isn't necessary for the flow, but it let's us check if the ops manager
-	// configuration is wrong ahead of time
-	_, err := config.Token(ctx)
+	switch conf.Auth["grant_type"] {
+	case "client_credentials", "client credentials", "clientcredentials":
+		isClientCredentials = true
+		authResp, err = uaaClient.ClientCredentials(
+			conf.Auth["client_id"],
+			conf.Auth["client_secret"],
+		)
+	case "resource_owner", "resource owner", "resourceowner", "password":
+		authResp, err = uaaClient.Password(
+			conf.Auth["client_id"],
+			conf.Auth["client_secret"],
+			conf.Auth["username"],
+			conf.Auth["password"],
+		)
+	}
 	if err != nil {
-		return nil, fmt.Errorf("Error fetching token with client_credentials grant: %s", err)
+		return nil, err
 	}
 
-	return config.Client(ctx), nil
-}
-
-func newResourceOwner(conf *Config) (*http.Client, error) {
-	config := &oauth2.Config{
-		ClientID:     conf.Auth["client_id"],
-		ClientSecret: conf.Auth["client_secret"],
-		Endpoint: oauth2.Endpoint{
-			TokenURL: fmt.Sprintf("%s/uaa/oauth/token", conf.Address),
-			AuthURL:  fmt.Sprintf("%s/uaa/oauth/authorize", conf.Address),
-		},
+	ret := &OmAccessor{
+		Client:              client,
+		clientID:            conf.Auth["client_id"],
+		clientSecret:        conf.Auth["client_secret"],
+		uaaClient:           uaaClient,
+		accessToken:         authResp.AccessToken,
+		refreshToken:        authResp.RefreshToken,
+		isClientCredentials: isClientCredentials,
+		URL:                 u,
 	}
 
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, newOmClient(conf))
+	go func() {
+		for range time.Tick(authResp.TTL / 2) {
+			err = ret.refresh()
+			if err != nil {
+				fmt.Printf("Failed to refresh token: %s\n", err)
+			}
+		}
+	}()
 
-	token, err := config.PasswordCredentialsToken(ctx, conf.Auth["username"], conf.Auth["password"])
-	if err != nil {
-		return nil, fmt.Errorf("Error fetching token with password grant: %s", err)
-	}
-
-	return config.Client(ctx, token), nil
+	return ret, nil
 }
 
 //Get attempts to get the secret stored at the requested backend path and
@@ -188,6 +184,29 @@ func (v *OmAccessor) getDeployments() ([]string, error) {
 	return deployments, nil
 }
 
+func (v *OmAccessor) setTokens(accessToken, refreshToken string) {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+	v.accessToken = accessToken
+	v.refreshToken = refreshToken
+}
+
+func (v *OmAccessor) refresh() error {
+	var authResp *uaa.AuthResponse
+	var err error
+	if v.isClientCredentials {
+		authResp, err = v.uaaClient.ClientCredentials(v.clientID, v.clientSecret)
+	} else {
+		authResp, err = v.uaaClient.Refresh(v.clientID, v.clientSecret, v.refreshToken)
+	}
+	if err != nil {
+		return err
+	}
+
+	v.setTokens(authResp.AccessToken, authResp.RefreshToken)
+	return nil
+}
+
 func (v *OmAccessor) opsmanAPI(path string) ([]byte, error) {
 	u := *v.URL
 	u.Path = fmt.Sprintf("%s%s", u.Path, path)
@@ -196,6 +215,10 @@ func (v *OmAccessor) opsmanAPI(path string) ([]byte, error) {
 	if err != nil {
 		return []byte{}, err
 	}
+
+	v.lock.RLock()
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", v.accessToken))
+	v.lock.RUnlock()
 
 	resp, err := v.Client.Do(req)
 	if err != nil {
