@@ -52,7 +52,7 @@ func (d *dashboardCmd) Run() error {
 
 	if len(within3Days) > 0 {
 		header := tablewriter.NewWriter(os.Stdout)
-		header.SetHeader([]string{"3 DAYS"})
+		header.SetHeader([]string{"WITHIN 3 DAYS"})
 		header.SetHeaderColor(tablewriter.Colors{
 			tablewriter.Bold,
 			tablewriter.BgBlackColor,
@@ -72,7 +72,7 @@ func (d *dashboardCmd) Run() error {
 
 	if len(within2Weeks) > 0 {
 		header := tablewriter.NewWriter(os.Stdout)
-		header.SetHeader([]string{"2 WEEKS"})
+		header.SetHeader([]string{"WITHIN 2 WEEKS"})
 		header.SetHeaderColor(tablewriter.Colors{
 			tablewriter.Bold,
 			tablewriter.BgBlackColor,
@@ -92,7 +92,7 @@ func (d *dashboardCmd) Run() error {
 
 	if len(within4Weeks) > 0 {
 		header := tablewriter.NewWriter(os.Stdout)
-		header.SetHeader([]string{"4 WEEKS"})
+		header.SetHeader([]string{"WITHIN 4 WEEKS"})
 		header.SetHeaderColor(tablewriter.Colors{
 			tablewriter.Bold,
 			tablewriter.BgBlackColor,
