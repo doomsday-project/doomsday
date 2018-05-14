@@ -1,8 +1,10 @@
 package server
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"sort"
@@ -18,7 +20,6 @@ type server struct {
 	Core *doomsday.Core
 }
 
-//TODO: Refactor this into helper functions
 func Start(conf Config) error {
 	var err error
 	logWriter := os.Stderr
@@ -101,7 +102,35 @@ func Start(conf Config) error {
 	router.HandleFunc("/v1/cache/refresh", auth(refreshCache(core))).Methods("POST")
 
 	fmt.Fprintf(logWriter, "Beginning listening on port %d\n", conf.Server.Port)
-	return http.ListenAndServe(fmt.Sprintf(":%d", conf.Server.Port), router)
+
+	if conf.Server.TLS.Cert != "" || conf.Server.TLS.Key != "" {
+		err = listenAndServeTLS(&conf, router)
+	} else {
+		err = http.ListenAndServe(fmt.Sprintf(":%d", conf.Server.Port), router)
+	}
+
+	return err
+}
+
+func listenAndServeTLS(conf *Config, handler http.Handler) error {
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.Server.Port))
+	if err != nil {
+		return err
+	}
+
+	defer ln.Close()
+
+	cert, err := tls.X509KeyPair([]byte(conf.Server.TLS.Cert), []byte(conf.Server.TLS.Key))
+	if err != nil {
+		return err
+	}
+
+	tlsListener := tls.NewListener(ln, &tls.Config{
+		NextProtos:   []string{"http/1.1"},
+		Certificates: []tls.Certificate{cert},
+	})
+
+	return http.Serve(tlsListener, handler)
 }
 
 func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) {

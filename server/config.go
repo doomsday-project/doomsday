@@ -14,7 +14,11 @@ type Config struct {
 	Server  struct {
 		Port    int    `yaml:"port"`
 		LogFile string `yaml:"logfile"`
-		Auth    struct {
+		TLS     struct {
+			Cert string `yaml:"cert"`
+			Key  string `yaml:"key"`
+		} `yaml:"tls"`
+		Auth struct {
 			Type   string            `yaml:"type"`
 			Config map[string]string `yaml:"config"`
 		} `yaml:"auth"`

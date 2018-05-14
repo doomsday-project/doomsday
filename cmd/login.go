@@ -35,7 +35,7 @@ func (l *loginCmd) Run() error {
 
 	err := client.UserpassAuth(*l.Username, *l.Password)
 	if err != nil {
-		return fmt.Errorf("Could not authenticate")
+		return fmt.Errorf("Could not authenticate: %s", err)
 	}
 
 	toAdd := *cliConf.CurrentTarget()
