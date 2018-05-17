@@ -69,8 +69,4 @@ server auth.
 
 ## Development
 
-This project uses https://github.com/kardianos/govendor. The vendored
-packages themselves are not tracked by the repo, but
-the index is, so you'll need to run `govendor sync`
-when cloning or changing to commits with different
-dependencies.
+This project uses https://github.com/kardianos/govendor.
