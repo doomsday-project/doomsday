@@ -66,3 +66,11 @@ server auth.
 `server.auth.config.username`: The username for the allowed user
 
 `server.auth.config.password`: The password for the allowed user
+
+## Development
+
+This project uses https://github.com/kardianos/govendor. The vendored
+packages themselves are not tracked by the repo, but
+the index is, so you'll need to run `govendor sync`
+when cloning or changing to commits with different
+dependencies.

@@ -2,3 +2,5 @@ doomsday
 ddayconfig.yml
 doomsday-darwin
 doomsday-linux
+vendor/*
+!vendor/vendor.json
