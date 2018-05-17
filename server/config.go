@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 
 	"github.com/thomasmmitchell/doomsday/storage"
 	yaml "gopkg.in/yaml.v2"
@@ -12,7 +13,7 @@ import (
 type Config struct {
 	Backend storage.Config `yaml:"backend"`
 	Server  struct {
-		Port    int    `yaml:"port"`
+		Port    uint16 `yaml:"port"`
 		LogFile string `yaml:"logfile"`
 		TLS     struct {
 			Cert string `yaml:"cert"`
@@ -26,6 +27,7 @@ type Config struct {
 }
 
 func ParseConfig(path string) (*Config, error) {
+
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("Could not open config at `%s': %s", path, err)
@@ -37,6 +39,8 @@ func ParseConfig(path string) (*Config, error) {
 	}
 
 	conf := Config{}
+	envPort, err := strconv.ParseUint(os.Getenv("PORT"), 10, 16)
+	conf.Server.Port = uint16(envPort)
 	err = yaml.Unmarshal(fileContents, &conf)
 	if err != nil {
 		return nil, fmt.Errorf("Could not parse config (%s) as YAML: %s", path, err)
