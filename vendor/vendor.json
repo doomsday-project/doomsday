@@ -403,36 +403,6 @@
 			"revisionTime": "2017-07-19T17:38:05Z"
 		},
 		{
-			"checksumSHA1": "Hk4sBOJs4Cv4OqyGfUvY0nDvWpY=",
-			"path": "github.com/thomasmmitchell/doomsday",
-			"revision": "85304dae28305200f00010edc4ed24336028bfe2",
-			"revisionTime": "2018-05-17T17:17:57Z"
-		},
-		{
-			"checksumSHA1": "Im5sfaw0GfBUf57YDpgxepaL48Y=",
-			"path": "github.com/thomasmmitchell/doomsday/cmd",
-			"revision": "85304dae28305200f00010edc4ed24336028bfe2",
-			"revisionTime": "2018-05-17T17:17:57Z"
-		},
-		{
-			"checksumSHA1": "pfaK6HcDFJfQyKoVB2rPUtjgEWM=",
-			"path": "github.com/thomasmmitchell/doomsday/server",
-			"revision": "85304dae28305200f00010edc4ed24336028bfe2",
-			"revisionTime": "2018-05-17T17:17:57Z"
-		},
-		{
-			"checksumSHA1": "tdU0YHyL6/YsItS0XwHtvS+6e/A=",
-			"path": "github.com/thomasmmitchell/doomsday/storage",
-			"revision": "85304dae28305200f00010edc4ed24336028bfe2",
-			"revisionTime": "2018-05-17T17:17:57Z"
-		},
-		{
-			"checksumSHA1": "Yl8y+5jkZtu+d7zASavPwr9CyVE=",
-			"path": "github.com/thomasmmitchell/doomsday/storage/uaa",
-			"revision": "85304dae28305200f00010edc4ed24336028bfe2",
-			"revisionTime": "2018-05-17T17:17:57Z"
-		},
-		{
 			"checksumSHA1": "IQkUIOnvlf0tYloFx9mLaXSvXWQ=",
 			"origin": "github.com/cloudfoundry-incubator/credhub-cli/vendor/golang.org/x/crypto/curve25519",
 			"path": "golang.org/x/crypto/curve25519",

@@ -117,9 +117,16 @@ func (b *Core) Paths() (storage.PathList, error) {
 func parseCert(c string) *x509.Certificate {
 	certChain := []*x509.Certificate{}
 	//Populate a potential chain of certs (or even just one) into this here slice
-	for pemBlock, rest := pem.Decode([]byte(c)); len(rest) > 0; pemBlock, rest = pem.Decode(rest) {
+	var pemBlock *pem.Block
+	var rest = []byte(c)
+	for {
+		pemBlock, rest = pem.Decode(rest)
 		//Skip over potential private keys in a cert chain.
-		if pemBlock == nil || pemBlock.Type != "CERTIFICATE" {
+		if pemBlock == nil {
+			break
+		}
+
+		if pemBlock.Type != "CERTIFICATE" {
 			continue
 		}
 
@@ -129,6 +136,9 @@ func parseCert(c string) *x509.Certificate {
 		}
 
 		certChain = append(certChain, cert)
+		if len(rest) == 0 {
+			break
+		}
 	}
 
 	return getLeafCert(certChain)
@@ -155,7 +165,7 @@ func getLeafCert(chain []*x509.Certificate) *x509.Certificate {
 		rootToLeaf := chain[0].CheckSignature(
 			chain[1].SignatureAlgorithm,
 			chain[1].RawTBSCertificate,
-			chain[1].Signature) != nil
+			chain[1].Signature) == nil
 
 		if rootToLeaf {
 			ret = chain[len(chain)-1]
