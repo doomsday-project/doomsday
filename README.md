@@ -67,6 +67,58 @@ server auth.
 
 `server.auth.config.password`: The password for the allowed user
 
+## Pushing to CloudFoundry
+
+You'll want to make a directory that has three
+files.
+
+* A binary of doomsday for the correct operating system
+* A doomsday server configuration manifest
+* A cf application manifest for deploying doomsday
+
+The binary can be found at the releases page for this Github repo.
+
+The server configuration manifest might look something like this,
+although you'll need to use the above documentation to tweak it for
+your needs.
+
+```yml
+---
+backend:
+  type: vault
+  address: https://127.0.0.1:8200
+  insecure_skip_verify: true
+  auth:
+    token: a-vault-root-token
+
+server:
+  auth:
+    type: userpass
+    config:
+      username: doomsday
+      password: password
+```
+
+The cf application manifest will probably look something like this,
+assuming that your binary is called `doomsday`, and your configuration
+manifest is called `doomsdayconf.yml`.
+
+```yml
+---
+applications:
+  - name: doomsday
+    memory: 256M
+    instances: 1
+    command: ./doomsday server -m doomsdayconf.yml
+    buildpack: binary_buildpack
+```
+
+Then, if your cf app manifest is called `manifest.yml`, run
+
+```sh
+cf push -f manifest.yml
+```
+
 ## Development
 
-This project uses https://github.com/kardianos/govendor.
+This project uses https://github.com/kardianos/govendor for vendoring.
