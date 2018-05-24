@@ -80,7 +80,9 @@ The binary can be found at the releases page for this Github repo.
 
 The server configuration manifest might look something like this,
 although you'll need to use the above documentation to tweak it for
-your needs.
+your needs. Specifically don't set `server.port` if you're deploying to Cloud
+Foundry. If that setting isn't found, then the value will fall back to the `PORT`
+environment variable, which is the desired behavior.
 
 ```yml
 ---
