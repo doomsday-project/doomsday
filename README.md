@@ -53,6 +53,11 @@ Only required if using the `password` grant type.
 `server.port`: _(int)_ The port that the doomsday server API listens on. If this isn't set, then it defaults to the PORT
 environment variable.
 
+`server.tls.cert`: _(string)_ The certificate PEM block to serve for TLS
+
+`server.tls.key`: _(string)_ The RSA private key PEM block corresponding to
+server.tls.cert
+
 `server.auth.type`: _(string, enum)_ The type of authentication to use for the server
 API. The only valid value is currently `userpass`. Omit this key to have no
 server auth.
