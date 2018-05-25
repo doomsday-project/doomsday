@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/thomasmmitchell/doomsday"
+	"github.com/thomasmmitchell/doomsday/server/auth"
 	"github.com/thomasmmitchell/doomsday/storage"
 )
 
@@ -22,6 +23,7 @@ type server struct {
 
 func Start(conf Config) error {
 	var err error
+
 	logWriter := os.Stderr
 	if conf.Server.LogFile != "" {
 		logWriter, err = os.OpenFile(conf.Server.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -31,6 +33,7 @@ func Start(conf Config) error {
 	}
 
 	fmt.Fprintf(logWriter, "Initializing server\n")
+	fmt.Fprintf(logWriter, "Configuring targeted storage backend\n")
 
 	var backend storage.Accessor
 	switch strings.ToLower(conf.Backend.Type) {
@@ -47,6 +50,8 @@ func Start(conf Config) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Fprintf(logWriter, "Setting up doomsday core components\n")
 
 	core := &doomsday.Core{
 		Backend: backend,
@@ -74,33 +79,27 @@ func Start(conf Config) error {
 
 	fmt.Fprintf(logWriter, "Began asynchronous cache population\n")
 
-	var shouldNotAuth bool
-	var authHandler http.Handler
+	fmt.Fprintf(logWriter, "Configuring frontend authentication\n")
+	var authorizer auth.Authorizer
 	switch conf.Server.Auth.Type {
-	case "":
+	case "", "nop", "none":
 		fmt.Fprintf(logWriter, "No server auth requested\n")
-		shouldNotAuth = true
+		authorizer = &auth.Nop{}
 	case "userpass":
 		fmt.Fprintf(logWriter, "userpass auth requested\n")
-		authHandler, err = newUserpassAuth(conf.Server.Auth.Config)
-		if err == nil {
-			fmt.Fprintf(logWriter, "session timeout configured for `%s'\n", authHandler.(*userpassAuth).Timeout)
-		}
+		authorizer = &auth.Userpass{}
 	default:
-		err = fmt.Errorf("Unrecognized auth type `%s'", conf.Server.Auth.Type)
-	}
-	if err != nil {
-		return fmt.Errorf("Error setting up auth: %s", err)
+		return fmt.Errorf("Unrecognized auth type `%s'", conf.Server.Auth.Type)
 	}
 
-	var auth authorizer
-	router := mux.NewRouter()
-	if shouldNotAuth {
-		auth = nopAuth
-	} else {
-		router.Handle("/v1/auth", authHandler).Methods("POST")
-		auth = sessionAuth
+	err = authorizer.Configure(conf.Server.Auth.Config)
+	if err != nil {
+		return fmt.Errorf("Error configuring auth: %s", err)
 	}
+
+	auth := authorizer.TokenHandler()
+	router := mux.NewRouter()
+	router.HandleFunc("/v1/auth", authorizer.LoginHandler()).Methods("POST")
 	router.HandleFunc("/v1/cache", auth(getCache(core))).Methods("GET")
 	router.HandleFunc("/v1/cache/refresh", auth(refreshCache(core))).Methods("POST")
 
