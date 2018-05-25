@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/pborman/uuid"
@@ -13,26 +14,36 @@ import (
 
 type sessions struct {
 	table   map[string]time.Time
+	lock    sync.RWMutex
 	timeout time.Duration
 	refresh bool
 }
 
 func (s *sessions) new() string {
 	u := uuid.NewUUID()
+	s.lock.Lock()
 	s.table[u.String()] = time.Now().Add(s.timeout)
+	s.lock.Unlock()
 	return u.String()
 }
 
 func (s *sessions) validate(sessionID string) bool {
-	if expiry, found := s.table[sessionID]; found {
+	s.lock.RLock()
+	expiry, found := s.table[sessionID]
+	s.lock.RUnlock()
+	if found {
 		if time.Now().Before(expiry) {
 			if s.refresh {
+				s.lock.Lock()
 				s.table[sessionID] = time.Now().Add(s.timeout)
+				s.lock.Unlock()
 			}
 			return true
 		}
 
+		s.lock.Lock()
 		delete(s.table, sessionID)
+		s.lock.Unlock()
 	}
 
 	return false
