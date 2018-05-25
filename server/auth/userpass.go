@@ -14,6 +14,7 @@ import (
 type sessions struct {
 	table   map[string]time.Time
 	timeout time.Duration
+	refresh bool
 }
 
 func (s *sessions) new() string {
@@ -25,6 +26,9 @@ func (s *sessions) new() string {
 func (s *sessions) validate(sessionID string) bool {
 	if expiry, found := s.table[sessionID]; found {
 		if time.Now().Before(expiry) {
+			if s.refresh {
+				s.table[sessionID] = time.Now().Add(s.timeout)
+			}
 			return true
 		}
 
@@ -68,6 +72,7 @@ func (u *Userpass) Configure(conf map[string]string) error {
 		sessions: sessions{
 			table:   map[string]time.Time{},
 			timeout: timeout,
+			refresh: conf["refresh"] != "" && conf["refresh"] != "false",
 		},
 	}
 

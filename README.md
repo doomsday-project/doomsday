@@ -71,12 +71,19 @@ values in the auth config must be strings.
 &nbsp;&nbsp;&nbsp;&nbsp;
 `server.auth.config.username`: The username for the allowed user
 
+&nbsp;&nbsp;&nbsp;&nbsp;
 `server.auth.config.password`: The password for the allowed user
 
+&nbsp;&nbsp;&nbsp;&nbsp;
 `server.auth.config.timeout`: A duration string representing the duration for
 which a session remains active. A duration string for 1 year, two days, three
 hours and four minutes would look like `1y2d3h4m`. For three and a half hours,
-it would look like `3h30m`. Spaces are ignored.
+it would look like `3h30m`. Spaces are ignored. Defaults to `30m`
+
+&nbsp;&nbsp;&nbsp;&nbsp;
+`server.auth.config.refresh`: Whether or not to refresh active auth tokens when
+they're used. Any string that isn't the empty string or `"false"` is considered
+true.
 
 ## Pushing to CloudFoundry
 

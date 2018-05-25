@@ -11,5 +11,3 @@ type Authorizer interface {
 }
 
 type TokenFunc func(http.HandlerFunc) http.HandlerFunc
-
-func nopAuth(fn http.HandlerFunc) http.HandlerFunc { return fn }
