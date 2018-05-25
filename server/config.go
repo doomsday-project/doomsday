@@ -27,7 +27,6 @@ type Config struct {
 }
 
 func ParseConfig(path string) (*Config, error) {
-
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("Could not open config at `%s': %s", path, err)

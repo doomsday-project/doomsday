@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
+	"github.com/thomasmmitchell/doomsday/duration"
 )
 
 var sessions = map[string]time.Time{}
 
-func newSession() string {
+func newSession(timeout time.Duration) string {
 	u := uuid.NewUUID()
-	sessions[u.String()] = time.Now().Add(30 * time.Minute)
+	sessions[u.String()] = time.Now().Add(timeout)
 	return u.String()
 }
 
@@ -33,6 +34,7 @@ func validateSession(sessionID string) bool {
 type userpassAuth struct {
 	Username string `json:"username" yaml:"username"`
 	Password string `json:"password" yaml:"password"`
+	Timeout  time.Duration
 }
 
 func newUserpassAuth(conf map[string]string) (*userpassAuth, error) {
@@ -48,9 +50,19 @@ func newUserpassAuth(conf map[string]string) (*userpassAuth, error) {
 		return nil, fmt.Errorf("No password provided in userpass auth config")
 	}
 
+	timeout := 30 * time.Minute
+	if conf["timeout"] != "" {
+		var err error
+		timeout, err = duration.Parse(conf["timeout"])
+		if err != nil {
+			return nil, fmt.Errorf("Could not parse server timeout string")
+		}
+	}
+
 	return &userpassAuth{
 		Username: conf["username"],
 		Password: conf["password"],
+		Timeout:  timeout,
 	}, nil
 }
 
@@ -61,7 +73,11 @@ func (u userpassAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	provided := userpassAuth{}
+	provided := struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}{}
+
 	err = json.Unmarshal(body, &provided)
 	if err != nil {
 		w.WriteHeader(400)
@@ -75,7 +91,7 @@ func (u userpassAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	w.Write([]byte(fmt.Sprintf(`{"token":"%s"}`+"\n", newSession())))
+	w.Write([]byte(fmt.Sprintf(`{"token":"%s"}`+"\n", newSession(u.Timeout))))
 }
 
 type authorizer func(http.HandlerFunc) http.HandlerFunc

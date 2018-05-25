@@ -50,8 +50,8 @@ Only required if using the `password` grant type.
 `backend.auth.password`: _(string)_ The password for the user to
  authenticate with. Only required if using the `password` grant type.
 
-`server.port`: _(int)_ The port that the doomsday server API listens on. If this isn't set, then it defaults to the PORT
-environment variable.
+`server.port`: _(int)_ The port that the doomsday server API listens on. If this
+isn't set, then it defaults to the PORT environment variable.
 
 `server.tls.cert`: _(string)_ The certificate PEM block to serve for TLS
 
@@ -62,7 +62,8 @@ server.tls.cert
 API. The only valid value is currently `userpass`. Omit this key to have no
 server auth.
 
-`server.auth.config`: _(hash)_ Configuration for the selected auth type
+`server.auth.config`: _(hash)_ Configuration for the selected auth type. All
+values in the auth config must be strings.
 
 &nbsp;&nbsp;&nbsp;&nbsp;
 **For `userpass` auth:**
@@ -71,6 +72,11 @@ server auth.
 `server.auth.config.username`: The username for the allowed user
 
 `server.auth.config.password`: The password for the allowed user
+
+`server.auth.config.timeout`: A duration string representing the duration for
+which a session remains active. A duration string for 1 year, two days, three
+hours and four minutes would look like `1y2d3h4m`. For three and a half hours,
+it would look like `3h30m`. Spaces are ignored.
 
 ## Pushing to CloudFoundry
 

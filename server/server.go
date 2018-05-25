@@ -78,17 +78,20 @@ func Start(conf Config) error {
 	var authHandler http.Handler
 	switch conf.Server.Auth.Type {
 	case "":
+		fmt.Fprintf(logWriter, "No server auth requested\n")
 		shouldNotAuth = true
 	case "userpass":
+		fmt.Fprintf(logWriter, "userpass auth requested\n")
 		authHandler, err = newUserpassAuth(conf.Server.Auth.Config)
+		if err == nil {
+			fmt.Fprintf(logWriter, "session timeout configured for `%s'\n", authHandler.(*userpassAuth).Timeout)
+		}
 	default:
 		err = fmt.Errorf("Unrecognized auth type `%s'", conf.Server.Auth.Type)
 	}
 	if err != nil {
 		return fmt.Errorf("Error setting up auth: %s", err)
 	}
-
-	fmt.Fprintf(logWriter, "Auth configured with type `%s'\n", conf.Server.Auth.Type)
 
 	var auth authorizer
 	router := mux.NewRouter()
