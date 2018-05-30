@@ -12,6 +12,9 @@ import (
 	"github.com/thomasmmitchell/doomsday/duration"
 )
 
+//AuthUserpass is the identifier returned by Nop.Userpass
+const AuthUserpass = "Userpass"
+
 type sessions struct {
 	table   map[string]time.Time
 	lock    sync.RWMutex
@@ -131,4 +134,8 @@ func (u *Userpass) TokenHandler() TokenFunc {
 			}
 		}
 	}
+}
+
+func (_ *Userpass) Identifier() string {
+	return AuthUserpass
 }

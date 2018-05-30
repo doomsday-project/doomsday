@@ -2,6 +2,9 @@ package auth
 
 import "net/http"
 
+//AuthNop is the identifier returned by Nop.Identifier
+const AuthNop = "None"
+
 type Nop struct{}
 
 func (_ Nop) Configure(map[string]string) error { return nil }
@@ -18,4 +21,8 @@ func (_ Nop) TokenHandler() TokenFunc {
 			fn(w, r)
 		}
 	}
+}
+
+func (_ Nop) Identifier() string {
+	return AuthNop
 }

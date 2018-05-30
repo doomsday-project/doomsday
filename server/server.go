@@ -99,6 +99,7 @@ func Start(conf Config) error {
 
 	auth := authorizer.TokenHandler()
 	router := mux.NewRouter()
+	router.HandleFunc("/v1/info", getInfo(authorizer.Identifier())).Methods("GET")
 	router.HandleFunc("/v1/auth", authorizer.LoginHandler()).Methods("POST")
 	router.HandleFunc("/v1/cache", auth(getCache(core))).Methods("GET")
 	router.HandleFunc("/v1/cache/refresh", auth(refreshCache(core))).Methods("POST")
@@ -133,6 +134,24 @@ func listenAndServeTLS(conf *Config, handler http.Handler) error {
 	})
 
 	return http.Serve(tlsListener, handler)
+}
+
+func getInfo(authType string) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		b, err := json.Marshal(struct {
+			Version  string `json:"version"`
+			AuthType string `json:"auth_type"`
+		}{
+			Version:  doomsday.Version,
+			AuthType: authType,
+		})
+		if err != nil {
+			panic("Could not marshal info into json")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(b)
+	}
 }
 
 func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) {
