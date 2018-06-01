@@ -136,6 +136,6 @@ func (u *Userpass) TokenHandler() TokenFunc {
 	}
 }
 
-func (_ *Userpass) Identifier() string {
+func (_ *Userpass) Identifier() AuthType {
 	return AuthUserpass
 }

@@ -9,6 +9,8 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"time"
+
+	"github.com/thomasmmitchell/doomsday/server/auth"
 )
 
 type Client struct {
@@ -154,4 +156,15 @@ func (c *Client) GetCache() (CacheItems, error) {
 //RefreshCache makes a request to asynchronously refresh the server cache
 func (c *Client) RefreshCache() error {
 	return c.doRequest("POST", "/v1/cache/refresh", nil, nil)
+}
+
+type InfoResponse struct {
+	Version  string        `json:"version"`
+	AuthType auth.AuthType `json:"auth_type"`
+}
+
+func (c *Client) Info() (*InfoResponse, error) {
+	resp := InfoResponse{}
+	err := c.doRequest("GET", "/v1/info", nil, &resp)
+	return &resp, err
 }

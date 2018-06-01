@@ -23,6 +23,6 @@ func (_ Nop) TokenHandler() TokenFunc {
 	}
 }
 
-func (_ Nop) Identifier() string {
+func (_ Nop) Identifier() AuthType {
 	return AuthNop
 }

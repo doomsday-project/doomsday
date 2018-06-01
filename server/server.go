@@ -136,14 +136,14 @@ func listenAndServeTLS(conf *Config, handler http.Handler) error {
 	return http.Serve(tlsListener, handler)
 }
 
-func getInfo(authType string) func(w http.ResponseWriter, r *http.Request) {
+func getInfo(authType auth.AuthType) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		b, err := json.Marshal(struct {
 			Version  string `json:"version"`
 			AuthType string `json:"auth_type"`
 		}{
 			Version:  doomsday.Version,
-			AuthType: authType,
+			AuthType: string(authType),
 		})
 		if err != nil {
 			panic("Could not marshal info into json")
