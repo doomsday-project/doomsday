@@ -70,14 +70,22 @@ type CLITarget struct {
 func (c *CLITarget) String() string {
 	buf := bytes.NewBuffer([]byte("\n"))
 	table := tablewriter.NewWriter(buf)
-	table.Append([]string{"Name", c.Name})
-	table.Append([]string{"Address", c.Address})
+
+	table.SetAutoFormatHeaders(false)
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetRowLine(true)
+
+	table.SetHeader([]string{"NAME", c.Name})
+	table.Append([]string{"ADDRESS", c.Address})
 	skipVerify := fmt.Sprintf("%t", c.SkipVerify)
 	if c.SkipVerify {
 		skipVerify = ansi.Sprintf("@R{%t}", c.SkipVerify)
 	}
-	table.Append([]string{"Skip Verify", skipVerify})
-	table.SetRowLine(true)
+	table.Append([]string{"SKIP VERIFY", skipVerify})
+
+	table.SetHeaderColor(tablewriter.Color(tablewriter.FgMagentaColor, tablewriter.Bold), tablewriter.Color(tablewriter.BgBlackColor))
+	table.SetColumnColor(tablewriter.Color(tablewriter.FgMagentaColor, tablewriter.Bold), tablewriter.Color(tablewriter.BgBlackColor))
 	table.Render()
 	return buf.String()
 }

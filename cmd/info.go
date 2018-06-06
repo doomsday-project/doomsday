@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/olekukonko/tablewriter"
@@ -14,16 +15,21 @@ func (i *infoCmd) Run() error {
 		return err
 	}
 
+	fmt.Println("")
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"VERSION", info.Version})
+
 	table.SetAutoFormatHeaders(false)
-	table.SetHeaderColor(tablewriter.Color(tablewriter.FgMagentaColor, tablewriter.Bold), tablewriter.Color(tablewriter.BgBlackColor))
-	table.Append([]string{"AUTH METHOD", string(info.AuthType)})
-	table.SetColumnColor(tablewriter.Color(tablewriter.FgMagentaColor, tablewriter.Bold), tablewriter.Color(tablewriter.BgBlackColor))
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.SetRowLine(true)
+
+	table.SetHeader([]string{"VERSION", info.Version})
+	table.Append([]string{"AUTH METHOD", string(info.AuthType)})
+
+	table.SetHeaderColor(tablewriter.Color(tablewriter.FgMagentaColor, tablewriter.Bold), tablewriter.Color(tablewriter.BgBlackColor))
+	table.SetColumnColor(tablewriter.Color(tablewriter.FgMagentaColor, tablewriter.Bold), tablewriter.Color(tablewriter.BgBlackColor))
 	table.Render()
+	fmt.Println("")
 
 	return nil
 }
