@@ -55,6 +55,9 @@ func registerCommands(app *kingpin.Application) {
 
 	_ = app.Command("refresh", "Refresh the servers cache")
 	cmdIndex["refresh"] = &refreshCmd{}
+
+	_ = app.Command("info", "Get info about the currently targeted doomsday server")
+	cmdIndex["info"] = &infoCmd{}
 }
 
 var app = kingpin.New("doomsday", "Cert expiration tracker")
