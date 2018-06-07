@@ -21,12 +21,14 @@ func registerCommands(app *kingpin.Application) {
 			Default("ddayconfig.yml").String(),
 	}
 
-	targetCom := app.Command("target", "Set a doomsday server to target")
+	targetCom := app.Command("target", "Manage targeted doomsday servers")
 	cmdIndex["target"] = &targetCmd{
 		Name:    targetCom.Arg("name", "The name of the target").String(),
 		Address: targetCom.Arg("address", "The address to set for this target").String(),
 		SkipVerify: targetCom.Flag("insecure", "Skip TLS cert validation for this backend").
 			Short('k').Bool(),
+		Delete: targetCom.Flag("delete", "Forget about the doomsday target with "+
+			"the given name. Delete will not fail if the target does not exist").Short('d').Bool(),
 	}
 
 	_ = app.Command("targets", "Print out configured targets")
