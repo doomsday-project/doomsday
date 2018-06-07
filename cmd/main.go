@@ -90,7 +90,7 @@ func main() {
 	}
 
 	switch cmd.(type) {
-	case *serverCmd, *targetCmd:
+	case *serverCmd, *targetCmd, *targetsCmd:
 	default:
 		target = cliConf.CurrentTarget()
 		if target == nil {
