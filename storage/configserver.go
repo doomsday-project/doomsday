@@ -11,10 +11,22 @@ import (
 )
 
 type ConfigServerAccessor struct {
-	Credhub *credhub.CredHub
+	credhub *credhub.CredHub
 }
 
-func NewConfigServerAccessor(conf *Config) (*ConfigServerAccessor, error) {
+type ConfigServerConfig struct {
+	Address            string `yaml:"address"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+	Auth               struct {
+		GrantType    string `yaml:"grant_type"`
+		ClientID     string `yaml:"client_id"`
+		ClientSecret string `yaml:"client_secret"`
+		Username     string `yaml:"username"`
+		Password     string `yaml:"password"`
+	} `yaml:"auth"`
+}
+
+func newConfigServerAccessor(conf ConfigServerConfig) (*ConfigServerAccessor, error) {
 	var err error
 	var authResp *uaa.AuthResponse
 
@@ -40,27 +52,27 @@ func NewConfigServerAccessor(conf *Config) (*ConfigServerAccessor, error) {
 
 	var isClientCredentials bool
 
-	switch conf.Auth["grant_type"] {
+	switch conf.Auth.GrantType {
 	case "client_credentials", "client credentials", "clientcredentials":
 		fmt.Println("Performing client credentials grant auth")
 		isClientCredentials = true
 		authResp, err = uaaClient.ClientCredentials(
-			conf.Auth["client_id"],
-			conf.Auth["client_secret"],
+			conf.Auth.ClientID,
+			conf.Auth.ClientSecret,
 		)
 
 	case "resource_owner", "resource owner", "resourceowner", "password":
 		fmt.Println("Performing password grant auth")
 		authResp, err = uaaClient.Password(
-			conf.Auth["client_id"],
-			conf.Auth["client_secret"],
-			conf.Auth["username"],
-			conf.Auth["password"],
+			conf.Auth.ClientID,
+			conf.Auth.ClientSecret,
+			conf.Auth.Username,
+			conf.Auth.Password,
 		)
 
 	case "none", "noop": //The default is the noop builder
 	default:
-		err = fmt.Errorf("Unknown auth grant_type `%s'", conf.Auth["grant_type"])
+		err = fmt.Errorf("Unknown auth grant_type `%s'", conf.Auth.GrantType)
 	}
 	if err != nil {
 		return nil, err
@@ -74,8 +86,8 @@ func NewConfigServerAccessor(conf *Config) (*ConfigServerAccessor, error) {
 	)
 
 	c.Auth = &refreshTokenStrategy{
-		ClientID:            conf.Auth["client_id"],
-		ClientSecret:        conf.Auth["client_secret"],
+		ClientID:            conf.Auth.ClientID,
+		ClientSecret:        conf.Auth.ClientSecret,
 		UAAClient:           &uaaClient,
 		APIClient:           c.Client(),
 		IsClientCredentials: isClientCredentials,
@@ -92,12 +104,12 @@ func NewConfigServerAccessor(conf *Config) (*ConfigServerAccessor, error) {
 		}
 	}()
 
-	return &ConfigServerAccessor{Credhub: c}, nil
+	return &ConfigServerAccessor{credhub: c}, nil
 }
 
 //List attempts to get all of the paths in the config server
 func (v *ConfigServerAccessor) List() (PathList, error) {
-	paths, err := v.Credhub.FindByPath("/")
+	paths, err := v.credhub.FindByPath("/")
 	if err != nil {
 		return nil, fmt.Errorf("Could not get paths in config server: %s", err)
 	}
@@ -111,7 +123,7 @@ func (v *ConfigServerAccessor) List() (PathList, error) {
 }
 
 func (v *ConfigServerAccessor) Get(path string) (map[string]string, error) {
-	cred, err := v.Credhub.GetLatestVersion(path)
+	cred, err := v.credhub.GetLatestVersion(path)
 	if err != nil {
 		return nil, err
 	}

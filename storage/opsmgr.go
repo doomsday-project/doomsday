@@ -27,7 +27,19 @@ type OmAccessor struct {
 	isClientCredentials bool
 }
 
-func newOmClient(conf *Config) *http.Client {
+type OmConfig struct {
+	Address            string `yaml:"address"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+	Auth               struct {
+		GrantType    string `yaml:"grant_type"`
+		Username     string `yaml:"username"`
+		Password     string `yaml:"password"`
+		ClientID     string `yaml:"client_id"`
+		ClientSecret string `yaml:"client_secret"`
+	} `yaml:"auth"`
+}
+
+func newOmClient(conf OmConfig) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
@@ -42,7 +54,7 @@ func newOmClient(conf *Config) *http.Client {
 	}
 }
 
-func NewOmAccessor(conf *Config) (*OmAccessor, error) {
+func newOmAccessor(conf OmConfig) (*OmAccessor, error) {
 	u, err := url.Parse(conf.Address)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse target url: %s", err)
@@ -61,19 +73,19 @@ func NewOmAccessor(conf *Config) (*OmAccessor, error) {
 
 	var isClientCredentials bool
 
-	switch conf.Auth["grant_type"] {
+	switch conf.Auth.GrantType {
 	case "client_credentials", "client credentials", "clientcredentials":
 		isClientCredentials = true
 		authResp, err = uaaClient.ClientCredentials(
-			conf.Auth["client_id"],
-			conf.Auth["client_secret"],
+			conf.Auth.ClientID,
+			conf.Auth.ClientSecret,
 		)
 	case "resource_owner", "resource owner", "resourceowner", "password":
 		authResp, err = uaaClient.Password(
-			conf.Auth["client_id"],
-			conf.Auth["client_secret"],
-			conf.Auth["username"],
-			conf.Auth["password"],
+			conf.Auth.ClientID,
+			conf.Auth.ClientSecret,
+			conf.Auth.Username,
+			conf.Auth.Password,
 		)
 	}
 	if err != nil {
@@ -82,8 +94,8 @@ func NewOmAccessor(conf *Config) (*OmAccessor, error) {
 
 	ret := &OmAccessor{
 		Client:              client,
-		clientID:            conf.Auth["client_id"],
-		clientSecret:        conf.Auth["client_secret"],
+		clientID:            conf.Auth.ClientID,
+		clientSecret:        conf.Auth.ClientSecret,
 		uaaClient:           uaaClient,
 		accessToken:         authResp.AccessToken,
 		refreshToken:        authResp.RefreshToken,

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -35,20 +34,7 @@ func Start(conf Config) error {
 	fmt.Fprintf(logWriter, "Initializing server\n")
 	fmt.Fprintf(logWriter, "Configuring targeted storage backend\n")
 
-	var backend storage.Accessor
-	switch strings.ToLower(conf.Backend.Type) {
-	case "vault":
-		backend, err = storage.NewVaultAccessor(&conf.Backend)
-	case "opsmgr", "ops manager", "opsman", "opsmanager":
-		backend, err = storage.NewOmAccessor(&conf.Backend)
-	case "credhub", "configserver", "config server":
-		backend, err = storage.NewConfigServerAccessor(&conf.Backend)
-	case "tls", "tlsclient":
-		backend, err = storage.NewTLSClientAccessor(&conf.Backend)
-	default:
-		err = fmt.Errorf("Unrecognized backend type (%s)", conf.Backend.Type)
-	}
-
+	backend, err := storage.NewAccessor(&conf.Backend)
 	if err != nil {
 		return err
 	}

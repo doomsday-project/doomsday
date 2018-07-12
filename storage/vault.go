@@ -11,25 +11,33 @@ import (
 )
 
 type VaultAccessor struct {
-	Client   *vaultkv.Client
-	BasePath string
+	client   *vaultkv.Client
+	basePath string
 }
 
-func NewVaultAccessor(conf *Config) (*VaultAccessor, error) {
+type VaultConfig struct {
+	Address            string `yaml:"address"`
+	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+	BasePath           string `yaml:"base_path"`
+	Auth               struct {
+		Token string `yaml:"token"`
+	} `yaml:"auth"`
+}
+
+func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 	u, err := url.Parse(conf.Address)
 	if err != nil {
 		return nil, fmt.Errorf("Could not parse url (%s) in config: %s", u, err)
 	}
 
-	basePath := "secret/"
-	if confBasePath, found := conf.Config["base_path"]; found {
-		basePath = fmt.Sprintf("%v/", confBasePath)
+	if conf.BasePath == "" {
+		conf.BasePath = "secret/"
 	}
 
 	return &VaultAccessor{
-		Client: &vaultkv.Client{
+		client: &vaultkv.Client{
 			VaultURL:  u,
-			AuthToken: conf.Auth["token"],
+			AuthToken: conf.Auth.Token,
 			Client: &http.Client{
 				Transport: &http.Transport{
 					TLSClientConfig: &tls.Config{
@@ -39,7 +47,7 @@ func NewVaultAccessor(conf *Config) (*VaultAccessor, error) {
 			},
 			//Trace: os.Stdout,
 		},
-		BasePath: basePath,
+		basePath: conf.BasePath,
 	}, nil
 
 }
@@ -48,18 +56,18 @@ func NewVaultAccessor(conf *Config) (*VaultAccessor, error) {
 // return it as a map.
 func (v *VaultAccessor) Get(path string) (map[string]string, error) {
 	ret := make(map[string]string)
-	err := v.Client.Get(path, &ret)
+	err := v.client.Get(path, &ret)
 	return ret, err
 }
 
 //List attempts to list all the paths under the configured base path
 func (v *VaultAccessor) List() (PathList, error) {
-	return v.list(v.BasePath)
+	return v.list(v.basePath)
 }
 
 func (v *VaultAccessor) list(path string) (PathList, error) {
 	var leaves []string
-	list, err := v.Client.List(path)
+	list, err := v.client.List(path)
 	if err != nil {
 		return nil, err
 	}

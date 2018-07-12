@@ -8,32 +8,26 @@ import (
 )
 
 type TLSClientAccessor struct {
-	Hosts []string
+	hosts []string
 }
 
-func NewTLSClientAccessor(conf *Config) (*TLSClientAccessor, error) {
+type TLSClientConfig struct {
+	Hosts []string `yaml:"hosts"`
+}
+
+func newTLSClientAccessor(conf TLSClientConfig) (*TLSClientAccessor, error) {
 	ret := &TLSClientAccessor{}
-	hostsInterface, exists := conf.Config["hosts"]
-	if !exists {
+	if len(conf.Hosts) == 0 {
 		return nil, fmt.Errorf("No hosts list was specified in the configuration")
 	}
 
-	hosts, isSlice := hostsInterface.([]interface{})
-	if !isSlice {
-		return nil, fmt.Errorf("The configured hosts key was not a list")
-	}
-
-	for _, hostInterface := range hosts {
-		host, isString := hostInterface.(string)
-		if !isString {
-			return nil, fmt.Errorf("The configured hosts list contained a non-string (%v)", hostInterface)
-		}
+	for _, host := range conf.Hosts {
 		thisURL, err := url.Parse(host)
 		if err != nil {
 			return nil, fmt.Errorf("The configured hosts list contained an invalid URL (%s): %s", host, err)
 		}
 
-		ret.Hosts = append(ret.Hosts, thisURL.String())
+		ret.hosts = append(ret.hosts, thisURL.String())
 	}
 
 	return ret, nil
@@ -74,8 +68,8 @@ func (t *TLSClientAccessor) Get(path string) (map[string]string, error) {
 }
 
 func (t *TLSClientAccessor) List() (PathList, error) {
-	ret := make(PathList, 0, len(t.Hosts))
-	for _, host := range t.Hosts {
+	ret := make(PathList, 0, len(t.hosts))
+	for _, host := range t.hosts {
 		ret = append(ret, host)
 	}
 
