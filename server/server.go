@@ -43,6 +43,8 @@ func Start(conf Config) error {
 		backend, err = storage.NewOmAccessor(&conf.Backend)
 	case "credhub", "configserver", "config server":
 		backend, err = storage.NewConfigServer(&conf.Backend)
+	case "tls", "tlsclient":
+		backend, err = storage.NewTLSClientAccessor(&conf.Backend)
 	default:
 		err = fmt.Errorf("Unrecognized backend type (%s)", conf.Backend.Type)
 	}

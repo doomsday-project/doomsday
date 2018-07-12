@@ -23,7 +23,7 @@ func NewVaultAccessor(conf *Config) (*VaultAccessor, error) {
 
 	basePath := "secret/"
 	if confBasePath, found := conf.Config["base_path"]; found {
-		basePath = fmt.Sprintf("%s/", confBasePath)
+		basePath = fmt.Sprintf("%v/", confBasePath)
 	}
 
 	return &VaultAccessor{

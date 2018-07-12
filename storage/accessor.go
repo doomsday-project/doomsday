@@ -1,11 +1,11 @@
 package storage
 
 type Config struct {
-	Type               string            `yaml:"type"`
-	Address            string            `yaml:"address"`
-	InsecureSkipVerify bool              `yaml:"insecure_skip_verify"`
-	Auth               map[string]string `yaml:"auth"`
-	Config             map[string]string `yaml:"config"`
+	Type               string                 `yaml:"type"`
+	Address            string                 `yaml:"address"`
+	InsecureSkipVerify bool                   `yaml:"insecure_skip_verify"`
+	Auth               map[string]string      `yaml:"auth"`
+	Config             map[string]interface{} `yaml:"config"`
 }
 
 type Accessor interface {
