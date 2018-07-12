@@ -14,7 +14,7 @@ type ConfigServerAccessor struct {
 	Credhub *credhub.CredHub
 }
 
-func NewConfigServer(conf *Config) (*ConfigServerAccessor, error) {
+func NewConfigServerAccessor(conf *Config) (*ConfigServerAccessor, error) {
 	var err error
 	var authResp *uaa.AuthResponse
 

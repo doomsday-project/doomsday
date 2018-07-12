@@ -42,7 +42,7 @@ func Start(conf Config) error {
 	case "opsmgr", "ops manager", "opsman", "opsmanager":
 		backend, err = storage.NewOmAccessor(&conf.Backend)
 	case "credhub", "configserver", "config server":
-		backend, err = storage.NewConfigServer(&conf.Backend)
+		backend, err = storage.NewConfigServerAccessor(&conf.Backend)
 	case "tls", "tlsclient":
 		backend, err = storage.NewTLSClientAccessor(&conf.Backend)
 	default:
