@@ -13,6 +13,7 @@ import (
 type VaultAccessor struct {
 	client   *vaultkv.Client
 	basePath string
+	name     string
 }
 
 type VaultConfig struct {
@@ -24,7 +25,7 @@ type VaultConfig struct {
 	} `yaml:"auth"`
 }
 
-func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
+func newVaultAccessor(name string, conf VaultConfig) (*VaultAccessor, error) {
 	u, err := url.Parse(conf.Address)
 	if err != nil {
 		return nil, fmt.Errorf("Could not parse url (%s) in config: %s", u, err)
@@ -48,6 +49,7 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 			//Trace: os.Stdout,
 		},
 		basePath: conf.BasePath,
+		name:     name,
 	}, nil
 
 }
@@ -86,6 +88,8 @@ func (v *VaultAccessor) list(path string) (PathList, error) {
 
 	return leaves, nil
 }
+
+func (v *VaultAccessor) Name() string { return v.name }
 
 func canonizePath(path string) string {
 	pathChunks := strings.Split(path, "/")

@@ -12,8 +12,8 @@ import (
 )
 
 type Config struct {
-	Backend storage.Config `yaml:"backend"`
-	Server  APIConfig      `yaml:"server"`
+	Backends []storage.Config `yaml:"backends"`
+	Server   APIConfig        `yaml:"server"`
 }
 
 type APIConfig struct {

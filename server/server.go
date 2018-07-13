@@ -32,17 +32,23 @@ func Start(conf Config) error {
 	}
 
 	fmt.Fprintf(logWriter, "Initializing server\n")
-	fmt.Fprintf(logWriter, "Configuring targeted storage backend\n")
+	fmt.Fprintf(logWriter, "Configuring targeted storage backends\n")
 
-	backend, err := storage.NewAccessor(&conf.Backend)
-	if err != nil {
-		return err
+	backends := make([]storage.Accessor, 0, len(conf.Backends))
+	for _, b := range conf.Backends {
+		fmt.Fprintf(logWriter, "Configuring backend `%s' of type `%s'\n", b.Name, b.Type)
+		thisBackend, err := storage.NewAccessor(&b)
+		if err != nil {
+			return fmt.Errorf("Error configuring backend `%s': %s", b.Name, err)
+		}
+
+		backends = append(backends, thisBackend)
 	}
 
 	fmt.Fprintf(logWriter, "Setting up doomsday core components\n")
 
 	core := &doomsday.Core{
-		Backend: backend,
+		Backends: backends,
 	}
 
 	core.SetCache(doomsday.NewCache())
@@ -137,9 +143,10 @@ func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) 
 		items := make([]doomsday.CacheItem, 0, len(data))
 		for k, v := range data {
 			items = append(items, doomsday.CacheItem{
-				Path:       k,
-				CommonName: v.Subject.CommonName,
-				NotAfter:   v.NotAfter.Unix(),
+				BackendName: v.Backend,
+				Path:        k,
+				CommonName:  v.Subject.CommonName,
+				NotAfter:    v.NotAfter.Unix(),
 			})
 		}
 

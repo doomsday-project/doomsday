@@ -54,7 +54,7 @@ func (s *listCmd) Run() error {
 
 func printList(items doomsday.CacheItems) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Common Name", "Expires In", "Path"})
+	table.SetHeader([]string{"Common Name", "Expires In", "Backend", "Path"})
 	for _, result := range items {
 		expiresIn := time.Until(time.Unix(result.NotAfter, 0))
 
@@ -65,6 +65,7 @@ func printList(items doomsday.CacheItems) {
 		table.Append([]string{
 			result.CommonName,
 			expStr,
+			result.BackendName,
 			result.Path,
 		})
 	}

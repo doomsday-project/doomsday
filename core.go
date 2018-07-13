@@ -10,7 +10,7 @@ import (
 )
 
 type Core struct {
-	Backend     storage.Accessor
+	Backends    []storage.Accessor
 	cache       *Cache
 	cacheLock   sync.RWMutex
 	BackendName string
@@ -28,19 +28,30 @@ func (b *Core) Cache() *Cache {
 }
 
 func (b *Core) Populate() error {
-	fmt.Printf("Enumerating possible paths\n")
-	paths, err := b.Paths()
-	if err != nil {
-		return err
+	newCache := NewCache()
+	for _, accessor := range b.Backends {
+		fmt.Printf("Enumerating possible paths for accessor `%s'\n", accessor.Name())
+		paths, err := accessor.List()
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Found %d paths to look up\n", len(paths))
+		err = b.populateUsing(accessor, newCache, paths)
+		if err != nil {
+			return err
+		}
 	}
 
-	fmt.Printf("Found %d paths to look up\n", len(paths))
-	return b.PopulateUsing(paths)
+	b.SetCache(newCache)
+	return nil
 }
 
-func (b *Core) PopulateUsing(paths storage.PathList) error {
+func (b *Core) populateUsing(backend storage.Accessor, cache *Cache, paths storage.PathList) error {
 	fmt.Println("Began populating credentials")
-	newCache := NewCache()
+	if cache == nil {
+		panic("Was given a nil cache")
+	}
 
 	const numWorkers = 4
 
@@ -55,7 +66,7 @@ func (b *Core) PopulateUsing(paths storage.PathList) error {
 
 	fetch := func() {
 		for path := range queue {
-			secret, err := b.Backend.Get(path)
+			secret, err := backend.Get(path)
 			if err != nil {
 				errChan <- err
 			}
@@ -63,8 +74,9 @@ func (b *Core) PopulateUsing(paths storage.PathList) error {
 			for _, v := range secret {
 				cert := parseCert(v)
 				if cert != nil {
-					newCache.Store(path,
+					cache.Store(path,
 						CacheObject{
+							Backend:  backend.Name(),
 							Subject:  cert.Subject,
 							NotAfter: cert.NotAfter,
 						},
@@ -100,18 +112,8 @@ doneWaiting:
 		return err
 	}
 
-	b.SetCache(newCache)
 	fmt.Println("Finished populating credentials")
 	return nil
-}
-
-func (b *Core) Paths() (storage.PathList, error) {
-	paths, err := b.Backend.List()
-	if err != nil {
-		return nil, err
-	}
-
-	return paths, nil
 }
 
 func parseCert(c string) *x509.Certificate {

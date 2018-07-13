@@ -9,14 +9,15 @@ import (
 
 type TLSClientAccessor struct {
 	hosts []string
+	name  string
 }
 
 type TLSClientConfig struct {
 	Hosts []string `yaml:"hosts"`
 }
 
-func newTLSClientAccessor(conf TLSClientConfig) (*TLSClientAccessor, error) {
-	ret := &TLSClientAccessor{}
+func newTLSClientAccessor(name string, conf TLSClientConfig) (*TLSClientAccessor, error) {
+	ret := &TLSClientAccessor{name: name}
 	if len(conf.Hosts) == 0 {
 		return nil, fmt.Errorf("No hosts list was specified in the configuration")
 	}
@@ -75,3 +76,5 @@ func (t *TLSClientAccessor) List() (PathList, error) {
 
 	return ret, nil
 }
+
+func (t *TLSClientAccessor) Name() string { return t.name }
