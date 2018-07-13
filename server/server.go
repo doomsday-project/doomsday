@@ -68,21 +68,9 @@ func Start(conf Config) error {
 	fmt.Fprintf(logWriter, "Began asynchronous cache population\n")
 
 	fmt.Fprintf(logWriter, "Configuring frontend authentication\n")
-	var authorizer auth.Authorizer
-	switch conf.Server.Auth.Type {
-	case "", "nop", "none":
-		fmt.Fprintf(logWriter, "No server auth requested\n")
-		authorizer = &auth.Nop{}
-	case "userpass":
-		fmt.Fprintf(logWriter, "userpass auth requested\n")
-		authorizer = &auth.Userpass{}
-	default:
-		return fmt.Errorf("Unrecognized auth type `%s'", conf.Server.Auth.Type)
-	}
-
-	err = authorizer.Configure(conf.Server.Auth.Config)
+	authorizer, err := auth.NewAuth(conf.Server.Auth)
 	if err != nil {
-		return fmt.Errorf("Error configuring auth: %s", err)
+		return err
 	}
 
 	auth := authorizer.TokenHandler()

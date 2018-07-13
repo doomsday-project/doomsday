@@ -6,8 +6,10 @@ import "net/http"
 const AuthNop = "None"
 
 type Nop struct{}
+type NopConfig struct{}
 
-func (_ Nop) Configure(map[string]string) error { return nil }
+func NewNop(_ NopConfig) (*Nop, error) { return &Nop{}, nil }
+
 func (_ Nop) LoginHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotImplemented)

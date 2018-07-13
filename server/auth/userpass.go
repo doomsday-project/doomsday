@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
-	"github.com/thomasmmitchell/doomsday/duration"
 )
 
 //AuthUserpass is the identifier returned by Nop.Userpass
@@ -58,39 +57,35 @@ type Userpass struct {
 	sessions sessions
 }
 
-func (u *Userpass) Configure(conf map[string]string) error {
-	if conf == nil {
-		return fmt.Errorf("No auth config provided")
+type UserpassConfig struct {
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	Timeout  int    `yaml:"timeout"`
+	Refresh  bool   `yaml:"refresh"`
+}
+
+func NewUserpass(conf UserpassConfig) (*Userpass, error) {
+	if conf.Username == "" {
+		return nil, fmt.Errorf("No username provided in userpass auth config")
 	}
 
-	if conf["username"] == "" {
-		return fmt.Errorf("No username provided in userpass auth config")
+	if conf.Password == "" {
+		return nil, fmt.Errorf("No password provided in userpass auth config")
 	}
 
-	if conf["password"] == "" {
-		return fmt.Errorf("No password provided in userpass auth config")
+	if conf.Timeout == 0 {
+		conf.Timeout = 30
 	}
 
-	timeout := 30 * time.Minute
-	if conf["timeout"] != "" {
-		var err error
-		timeout, err = duration.Parse(conf["timeout"])
-		if err != nil {
-			return fmt.Errorf("Could not parse server timeout string")
-		}
-	}
-
-	*u = Userpass{
-		username: conf["username"],
-		password: conf["password"],
+	return &Userpass{
+		username: conf.Username,
+		password: conf.Password,
 		sessions: sessions{
 			table:   map[string]time.Time{},
-			timeout: timeout,
-			refresh: conf["refresh"] != "" && conf["refresh"] != "false",
+			timeout: time.Duration(conf.Timeout) * time.Minute,
+			refresh: conf.Refresh,
 		},
-	}
-
-	return nil
+	}, nil
 }
 
 func (u *Userpass) LoginHandler() http.HandlerFunc {

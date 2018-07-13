@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/thomasmmitchell/doomsday/server/auth"
 	"github.com/thomasmmitchell/doomsday/storage"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -22,10 +23,7 @@ type APIConfig struct {
 		Cert string `yaml:"cert"`
 		Key  string `yaml:"key"`
 	} `yaml:"tls"`
-	Auth struct {
-		Type   string            `yaml:"type"`
-		Config map[string]string `yaml:"config"`
-	} `yaml:"auth"`
+	Auth auth.Config `yaml:"auth"`
 }
 
 func ParseConfig(path string) (*Config, error) {
