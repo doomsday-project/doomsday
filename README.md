@@ -47,7 +47,3 @@ cf push -f manifest.yml
 ## Development
 
 This project uses https://github.com/kardianos/govendor for vendoring.
-
-To run tests, run `./test` from the root of the repo. This orchestrates some
-multithreaded tests (thanks, Ginkgo) that are a bunch faster than running the
-tests on your own.
