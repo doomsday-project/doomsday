@@ -1,0 +1,133 @@
+#This is a doomsday server configuration manifest
+
+# backends: (hash) The list of backends to ingest certificates from. Each entry
+# in the backends list is a hash that looks like
+#  - type: <backend-type>
+#    name: <backend-name>
+#    properties:
+#      backend: specific
+#
+# type: (string, enum) Currently supported types are "vault", "opsmgr",
+#   "credhub", and "tlsclient".
+# name: (string) Attached to objects returned from the doomsday API to
+#   identify where each item came from. Defaults to the backend `type` string.
+# properties (hash): Backend-specific. You should look below for how to
+#   configure each one.
+backends:
+# Hashicorp's Vault. https://www.vaultproject.io/
+- type: vault
+  name: myvault
+  properties:
+    # (string) The URL where the Vault API is located
+    address: https://127.0.0.1:443
+    # (bool) (default: false) Is Vault listening for TLS but the cert isn't
+    # trusted? Make this true. Otherwise leave it false.
+    insecure_skip_verify: true
+    # (string) This is the path to begin looking for Vault secrets. Everything under this
+    # path will be searched. Defaults to "secret/" if not present.
+    base_path: "secret/"
+    # (hash) Options for authorizing to Vault
+    auth:
+      # (string) A Vault authentication token.
+      token: 01234567-89ab-cdef-0123-456789abcdef
+
+# Checks certs of configured URLs by connecting over TCP, attempting a TLS
+#   handshake, and then returning the served certificate
+- type: tlsclient
+  name: mytlsclient
+  properties:
+    # (list) A list of URLs to connect to. You should omit the scheme of the URLs
+    hosts:
+    # (string)
+    - starkandwayne.com
+    - shieldproject.io
+    - genesisproject.io
+
+# Pivotal Ops Manager. https://network.pivotal.io/products/ops-manager
+- type: opsmgr
+  name: myopsmanager
+  properties:
+    # (string) The URL of the Ops Manager API location.
+    address: https://127.0.0.1:443
+    # (bool) (default: false) Is the Ops Manager API cert not trusted? Make
+    # this true. Otherwise leave it false.
+    insecure_skip_verify: false
+    # (hash) Options for authorizing to the UAA attached to your Ops Manager
+    auth:
+      # (string) The grant type with which you are going to authenticate to the UAA
+      # One of "password" or "client_credentials". If it's "client_credentials",
+      # provide "client_id" and "client_secret". If it's "password", then provide
+      # "client_id", "client_secret", "username", and "password"
+      grant_type: password
+      # (string) The id of the OAuth client
+      client_id: opsman
+      # (string) The secret of the OAuth client
+      client_secret: ""
+      # (string) The username of the user to use (if doing password grant type)
+      username: admin
+      # (string) The password of the user to use (if doing password grant type)
+      password: password
+
+# Pivotal's Credhub. https://github.com/cloudfoundry-incubator/credhub
+# An implementation of the BOSH Config Server API.
+- type: credhub
+  name: mycredhub
+  properties:
+    # (string) The URL where the Credhub API is located
+    address: https://127.0.0.1:8844
+    # (bool) (default: false) Is the Credhub API cert not trusted? Make
+    # this true. Otherwise leave it false.
+    insecure_skip_verify: false
+    # (hash) Options for authorizing to the UAA attached to your Credhub.
+    # This is the same as the Ops Manager auth options. Check that out.
+    auth:
+      grant_type: password
+      client_id: credhub_cli
+      client_secret: ""
+      username: credhub-cli
+      password: password
+
+# (hash) Configuration for the doomsday server API
+server:
+  # (number) (default: 8111)
+  port: 8111
+  # (hash) If present, this have Doomsday's API listen with TLS.
+  tls:
+    # (string) An x509 certificate to serve from the API
+    cert: |
+      -----BEGIN CERTIFICATE-----
+      fAKe
+      -----END CERTIFICATE-----
+
+    # (string) The RSA key used to sign `cert`
+    key: |
+      -----BEGIN RSA PRIVATE KEY-----
+      fAKe
+      -----END RSA PRIVATE KEY-----
+
+  # Authentication options for the doomsday API. This may differ depending on
+  # the auth type you're configuring, but at the top level, it looks like:
+  #
+  # type: <auth-type>
+  # properties:
+  #   backend: specific
+  #
+  # Available auth types are `none` and `userpass`
+  # Userpass is an in-memory auth method that accepts a static username and
+  # password and, if correct, hands back a session bearer token which expires.
+  # The `none` type has no properties. You may leave the properties hash absent
+  #   in that case.
+  auth:
+    #type: none
+    type: userpass
+    properties:
+      # (string) The username to accept logins for
+      username: admin
+      # (string) The password to accept logins for
+      password: password
+      # (number) How many minutes a session token lasts before it is invalid.
+      timeout: 30
+      # (bool) If true, a session token has its validity length refreshed to
+      # the configured timeout when it is used, so long as it is used while
+      # still valid.
+      refresh: true
