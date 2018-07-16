@@ -16,10 +16,6 @@ import (
 	"github.com/thomasmmitchell/doomsday/storage"
 )
 
-type server struct {
-	Core *doomsday.Core
-}
-
 func Start(conf Config) error {
 	var err error
 
@@ -34,7 +30,7 @@ func Start(conf Config) error {
 	fmt.Fprintf(logWriter, "Initializing server\n")
 	fmt.Fprintf(logWriter, "Configuring targeted storage backends\n")
 
-	backends := make([]storage.Accessor, 0, len(conf.Backends))
+	sources := make([]source, 0, len(conf.Backends))
 	for _, b := range conf.Backends {
 		fmt.Fprintf(logWriter, "Configuring backend `%s' of type `%s'\n", b.Name, b.Type)
 		thisBackend, err := storage.NewAccessor(&b)
@@ -42,34 +38,14 @@ func Start(conf Config) error {
 			return fmt.Errorf("Error configuring backend `%s': %s", b.Name, err)
 		}
 
-		backends = append(backends, thisBackend)
+		thisCore := doomsday.Core{Backend: thisBackend, BackendName: b.Name}
+		thisCore.SetCache(doomsday.NewCache())
+
+		sources = append(sources, source{Core: &thisCore, Interval: 30 * time.Minute})
 	}
 
-	fmt.Fprintf(logWriter, "Setting up doomsday core components\n")
-
-	core := &doomsday.Core{
-		Backends: backends,
-	}
-
-	core.SetCache(doomsday.NewCache())
-
-	populate := func() {
-		startedAt := time.Now()
-		err := core.Populate()
-		if err != nil {
-			fmt.Fprintf(logWriter, "%s: Error populating cache: %s\n", time.Now(), err)
-		}
-		fmt.Printf("Populate took %s\n", time.Since(startedAt))
-	}
-
-	go func() {
-		populate()
-		interval := time.NewTicker(time.Hour)
-		defer interval.Stop()
-		for range interval.C {
-			populate()
-		}
-	}()
+	manager := newSourceManager(sources, logWriter)
+	manager.BackgroundScheduler()
 
 	fmt.Fprintf(logWriter, "Began asynchronous cache population\n")
 
@@ -83,8 +59,8 @@ func Start(conf Config) error {
 	router := mux.NewRouter()
 	router.HandleFunc("/v1/info", getInfo(authorizer.Identifier())).Methods("GET")
 	router.HandleFunc("/v1/auth", authorizer.LoginHandler()).Methods("POST")
-	router.HandleFunc("/v1/cache", auth(getCache(core))).Methods("GET")
-	router.HandleFunc("/v1/cache/refresh", auth(refreshCache(core))).Methods("POST")
+	router.HandleFunc("/v1/cache", auth(getCache(manager))).Methods("GET")
+	router.HandleFunc("/v1/cache/refresh", auth(refreshCache(manager))).Methods("POST")
 
 	fmt.Fprintf(logWriter, "Beginning listening on port %d\n", conf.Server.Port)
 
@@ -136,20 +112,9 @@ func getInfo(authType auth.AuthType) func(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) {
+func getCache(manager *sourceManager) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		data := core.Cache().Map()
-		items := make([]doomsday.CacheItem, 0, len(data))
-		for k, v := range data {
-			items = append(items, doomsday.CacheItem{
-				BackendName: v.Backend,
-				Path:        k,
-				CommonName:  v.Subject.CommonName,
-				NotAfter:    v.NotAfter.Unix(),
-			})
-		}
-
+		items := manager.Data()
 		sort.Slice(items, func(i, j int) bool { return items[i].NotAfter < items[j].NotAfter })
 
 		resp, err := json.Marshal(&doomsday.GetCacheResponse{Content: items})
@@ -163,9 +128,9 @@ func getCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func refreshCache(core *doomsday.Core) func(w http.ResponseWriter, r *http.Request) {
+func refreshCache(manager *sourceManager) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		go core.Populate()
+		go manager.RefreshAll()
 		w.WriteHeader(204)
 	}
 }

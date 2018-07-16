@@ -10,10 +10,10 @@ import (
 )
 
 type Core struct {
-	Backends    []storage.Accessor
+	Backend     storage.Accessor
+	BackendName string
 	cache       *Cache
 	cacheLock   sync.RWMutex
-	BackendName string
 }
 
 func (b *Core) SetCache(c *Cache) {
@@ -29,26 +29,24 @@ func (b *Core) Cache() *Cache {
 
 func (b *Core) Populate() error {
 	newCache := NewCache()
-	for _, accessor := range b.Backends {
-		fmt.Printf("Enumerating possible paths for accessor `%s'\n", accessor.Name())
-		paths, err := accessor.List()
-		if err != nil {
-			return err
-		}
+	fmt.Printf("Enumerating possible paths for `%s'\n", b.BackendName)
+	paths, err := b.Backend.List()
+	if err != nil {
+		return err
+	}
 
-		fmt.Printf("Found %d paths to look up\n", len(paths))
-		err = b.populateUsing(accessor, newCache, paths)
-		if err != nil {
-			return err
-		}
+	fmt.Printf("Found %d paths to look up for `%s'\n", len(paths), b.BackendName)
+	err = b.populateUsing(newCache, paths)
+	if err != nil {
+		return err
 	}
 
 	b.SetCache(newCache)
 	return nil
 }
 
-func (b *Core) populateUsing(backend storage.Accessor, cache *Cache, paths storage.PathList) error {
-	fmt.Println("Began populating credentials")
+func (b *Core) populateUsing(cache *Cache, paths storage.PathList) error {
+	fmt.Printf("Began populating credentials for `%s'\n", b.BackendName)
 	if cache == nil {
 		panic("Was given a nil cache")
 	}
@@ -66,7 +64,7 @@ func (b *Core) populateUsing(backend storage.Accessor, cache *Cache, paths stora
 
 	fetch := func() {
 		for path := range queue {
-			secret, err := backend.Get(path)
+			secret, err := b.Backend.Get(path)
 			if err != nil {
 				errChan <- err
 			}
@@ -76,7 +74,6 @@ func (b *Core) populateUsing(backend storage.Accessor, cache *Cache, paths stora
 				if cert != nil {
 					cache.Store(path,
 						CacheObject{
-							Backend:  backend.Name(),
 							Subject:  cert.Subject,
 							NotAfter: cert.NotAfter,
 						},
@@ -112,7 +109,7 @@ doneWaiting:
 		return err
 	}
 
-	fmt.Println("Finished populating credentials")
+	fmt.Printf("Finished populating credentials for `%s'\n", b.BackendName)
 	return nil
 }
 
