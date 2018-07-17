@@ -3,6 +3,7 @@ package doomsday
 import (
 	"crypto/x509"
 	"encoding/pem"
+	"runtime"
 	"sync"
 
 	"github.com/thomasmmitchell/doomsday/storage"
@@ -52,7 +53,13 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateSta
 		panic("Was given a nil cache")
 	}
 
-	const numWorkers = 4
+	var numWorkers = runtime.NumCPU() - 1
+	if len(paths) < numWorkers {
+		numWorkers = len(paths)
+	}
+
+	barrier := sync.WaitGroup{}
+	barrier.Add(numWorkers)
 
 	queue := make(chan string, len(paths))
 	for _, path := range paths {
@@ -60,22 +67,22 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateSta
 	}
 	close(queue)
 
-	doneChan := make(chan bool, numWorkers)
-	errCount := 0
 	certCount := 0
+	successCount := 0
+	statLock := sync.Mutex{}
 
 	fetch := func() {
+		mySuccessCount, myCertCount := 0, 0
 		for path := range queue {
 			secret, err := b.Backend.Get(path)
 			if err != nil {
-				errCount++
 				continue
 			}
 
 			for _, v := range secret {
 				cert := parseCert(v)
 				if cert != nil {
-					certCount++
+					myCertCount++
 					cache.Store(path,
 						CacheObject{
 							Subject:  cert.Subject,
@@ -87,25 +94,24 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateSta
 					break
 				}
 			}
+			mySuccessCount++
 		}
-		doneChan <- true
+		statLock.Lock()
+		successCount += mySuccessCount
+		certCount += myCertCount
+		statLock.Unlock()
+		barrier.Done()
 	}
 
 	for i := 0; i < numWorkers; i++ {
 		go fetch()
 	}
 
-	numDone := 0
-	for range doneChan {
-		numDone++
-		if numDone == numWorkers {
-			break
-		}
-	}
+	barrier.Wait()
 
 	return &PopulateStats{
 		NumPaths:   len(paths),
-		NumSuccess: len(paths) - errCount,
+		NumSuccess: successCount,
 		NumCerts:   certCount,
 	}, nil
 }
