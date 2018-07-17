@@ -7,12 +7,6 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-type Config struct {
-	Type       string                 `yaml:"type"`
-	Name       string                 `yaml:"name"`
-	Properties map[string]interface{} `yaml:"properties"`
-}
-
 type Accessor interface {
 	List() (PathList, error)
 	Get(path string) (map[string]string, error)
@@ -26,15 +20,15 @@ const (
 	typeTLS
 )
 
-func NewAccessor(conf *Config) (Accessor, error) {
-	properties, err := yaml.Marshal(&conf.Properties)
+func NewAccessor(accessorType string, conf map[string]interface{}) (Accessor, error) {
+	properties, err := yaml.Marshal(&conf)
 	if err != nil {
 		panic("Could not re-marshal into YAML")
 	}
 
-	t := resolveType(strings.ToLower(conf.Type))
+	t := resolveType(strings.ToLower(accessorType))
 	if t == typeUnknown {
-		return nil, fmt.Errorf("Unrecognized backend type (%s)", conf.Type)
+		return nil, fmt.Errorf("Unrecognized backend type (%s)", accessorType)
 	}
 
 	var c interface{}

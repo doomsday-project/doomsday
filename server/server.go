@@ -33,7 +33,7 @@ func Start(conf Config) error {
 	sources := make([]source, 0, len(conf.Backends))
 	for _, b := range conf.Backends {
 		fmt.Fprintf(logWriter, "Configuring backend `%s' of type `%s'\n", b.Name, b.Type)
-		thisBackend, err := storage.NewAccessor(&b)
+		thisBackend, err := storage.NewAccessor(b.Type, b.Properties)
 		if err != nil {
 			return fmt.Errorf("Error configuring backend `%s': %s", b.Name, err)
 		}
@@ -46,7 +46,13 @@ func Start(conf Config) error {
 			b.Name = b.Type
 		}
 
-		sources = append(sources, source{Core: &thisCore, Name: backendName, Interval: 30 * time.Minute})
+		sources = append(sources,
+			source{
+				Core:     &thisCore,
+				Name:     backendName,
+				Interval: time.Duration(b.RefreshInterval) * time.Minute,
+			},
+		)
 	}
 
 	manager := newSourceManager(sources, logWriter)

@@ -7,13 +7,12 @@ import (
 	"strconv"
 
 	"github.com/thomasmmitchell/doomsday/server/auth"
-	"github.com/thomasmmitchell/doomsday/storage"
 	yaml "gopkg.in/yaml.v2"
 )
 
 type Config struct {
-	Backends []storage.Config `yaml:"backends"`
-	Server   APIConfig        `yaml:"server"`
+	Backends []BackendConfig `yaml:"backends"`
+	Server   APIConfig       `yaml:"server"`
 }
 
 type APIConfig struct {
@@ -24,6 +23,14 @@ type APIConfig struct {
 		Key  string `yaml:"key"`
 	} `yaml:"tls"`
 	Auth auth.Config `yaml:"auth"`
+}
+
+type BackendConfig struct {
+	Type string `yaml:"type"`
+	Name string `yaml:"name"`
+	//in minutes
+	RefreshInterval int                    `yaml:"refresh_interval"`
+	Properties      map[string]interface{} `yaml:"properties"`
 }
 
 func ParseConfig(path string) (*Config, error) {
@@ -59,9 +66,22 @@ func ParseConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("Could not parse config (%s) as YAML: %s", path, err)
 	}
 
+	//Post Defaults
+	for i, b := range conf.Backends {
+		if b.RefreshInterval == 0 {
+			conf.Backends[i].RefreshInterval = 30
+		}
+	}
+
 	//Validation
 	if conf.Server.Port < 0 || conf.Server.Port > 65535 {
 		return nil, fmt.Errorf("Port number is invalid")
+	}
+
+	for _, b := range conf.Backends {
+		if b.RefreshInterval <= 0 {
+			return nil, fmt.Errorf("Refresh interval for backend must be greater than or equal to 0 - got %d", b.RefreshInterval)
+		}
 	}
 
 	return &conf, nil
