@@ -10,10 +10,9 @@ import (
 )
 
 type Core struct {
-	Backend     storage.Accessor
-	BackendName string
-	cache       *Cache
-	cacheLock   sync.RWMutex
+	Backend   storage.Accessor
+	cache     *Cache
+	cacheLock sync.RWMutex
 }
 
 func (b *Core) SetCache(c *Cache) {
@@ -29,13 +28,12 @@ func (b *Core) Cache() *Cache {
 
 func (b *Core) Populate() error {
 	newCache := NewCache()
-	fmt.Printf("Enumerating possible paths for `%s'\n", b.BackendName)
 	paths, err := b.Backend.List()
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Found %d paths to look up for `%s'\n", len(paths), b.BackendName)
+	fmt.Printf("Found %d paths to look up\n", len(paths))
 	err = b.populateUsing(newCache, paths)
 	if err != nil {
 		return err
@@ -46,7 +44,6 @@ func (b *Core) Populate() error {
 }
 
 func (b *Core) populateUsing(cache *Cache, paths storage.PathList) error {
-	fmt.Printf("Began populating credentials for `%s'\n", b.BackendName)
 	if cache == nil {
 		panic("Was given a nil cache")
 	}
@@ -109,7 +106,6 @@ doneWaiting:
 		return err
 	}
 
-	fmt.Printf("Finished populating credentials for `%s'\n", b.BackendName)
 	return nil
 }
 

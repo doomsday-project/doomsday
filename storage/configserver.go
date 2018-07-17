@@ -12,7 +12,6 @@ import (
 
 type ConfigServerAccessor struct {
 	credhub *credhub.CredHub
-	name    string
 }
 
 type ConfigServerConfig struct {
@@ -27,7 +26,7 @@ type ConfigServerConfig struct {
 	} `yaml:"auth"`
 }
 
-func newConfigServerAccessor(name string, conf ConfigServerConfig) (*ConfigServerAccessor, error) {
+func newConfigServerAccessor(conf ConfigServerConfig) (*ConfigServerAccessor, error) {
 	var err error
 	var authResp *uaa.AuthResponse
 
@@ -105,7 +104,7 @@ func newConfigServerAccessor(name string, conf ConfigServerConfig) (*ConfigServe
 		}
 	}()
 
-	return &ConfigServerAccessor{credhub: c, name: name}, nil
+	return &ConfigServerAccessor{credhub: c}, nil
 }
 
 //List attempts to get all of the paths in the config server
@@ -137,8 +136,6 @@ func (v *ConfigServerAccessor) Get(path string) (map[string]string, error) {
 
 	return nil, nil
 }
-
-func (v *ConfigServerAccessor) Name() string { return v.name }
 
 type refreshTokenStrategy struct {
 	lock                sync.RWMutex

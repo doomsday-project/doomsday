@@ -12,6 +12,7 @@ import (
 
 type source struct {
 	Core     *doomsday.Core
+	Name     string
 	Interval time.Duration
 	nextRun  time.Time
 }
@@ -19,6 +20,16 @@ type source struct {
 //Bump sets nextRun to now + interval
 func (s *source) Bump() {
 	s.nextRun = time.Now().Add(s.Interval)
+}
+
+func (s *source) Refresh(mode string, logger *os.File) {
+	fmt.Fprintf(logger, "Running %s populate of `%s'\n", mode, s.Name)
+	startedAt := time.Now()
+	err := s.Core.Populate()
+	if err != nil {
+		fmt.Fprintf(logger, "Error populating info from backend `%s': %s\n", s.Name, err)
+	}
+	fmt.Fprintf(logger, "Finished %s populate of `%s' after %s\n", mode, s.Name, time.Since(startedAt))
 }
 
 type sourceManager struct {
@@ -69,11 +80,7 @@ func (s *sourceManager) BackgroundScheduler() {
 			s.lock.Unlock()
 
 			if shouldRun {
-				err := current.Core.Populate()
-				if err != nil {
-					fmt.Fprintf(s.logger, "Error populating info from backend `%s': %s\n", current.Core.BackendName, err)
-				}
-
+				current.Refresh("scheduled", s.logger)
 			}
 
 			s.lock.RLock()
@@ -103,7 +110,7 @@ func (s *sourceManager) Data() []doomsday.CacheItem {
 		data := source.Core.Cache().Map()
 		for k, v := range data {
 			items = append(items, doomsday.CacheItem{
-				BackendName: source.Core.BackendName,
+				BackendName: source.Name,
 				Path:        k,
 				CommonName:  v.Subject.CommonName,
 				NotAfter:    v.NotAfter.Unix(),
@@ -115,7 +122,7 @@ func (s *sourceManager) Data() []doomsday.CacheItem {
 }
 
 func (s *sourceManager) RefreshAll() {
-	//How long must have passed before we'll refresh a backend by request to avoid spamming?
+	//How long must have passed before we'll refresh a backend by request to avoid spamming
 	const tooRecentThreshold time.Duration = time.Minute
 	for _, current := range s.sources {
 		s.lock.Lock()
@@ -129,10 +136,7 @@ func (s *sourceManager) RefreshAll() {
 		s.lock.Unlock()
 
 		if shouldRun {
-			err := current.Core.Populate()
-			if err != nil {
-				fmt.Fprintf(s.logger, "Error populating info from backend `%s': %s\n", current.Core.BackendName, err)
-			}
+			current.Refresh("ad-hoc", s.logger)
 		}
 	}
 }

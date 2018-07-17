@@ -14,7 +14,6 @@ type Config struct {
 }
 
 type Accessor interface {
-	Name() string
 	List() (PathList, error)
 	Get(path string) (map[string]string, error)
 }
@@ -36,11 +35,6 @@ func NewAccessor(conf *Config) (Accessor, error) {
 	t := resolveType(strings.ToLower(conf.Type))
 	if t == typeUnknown {
 		return nil, fmt.Errorf("Unrecognized backend type (%s)", conf.Type)
-	}
-
-	if conf.Name == "" {
-		//Default name to type name
-		conf.Name = conf.Type
 	}
 
 	var c interface{}
@@ -67,13 +61,13 @@ func NewAccessor(conf *Config) (Accessor, error) {
 	var backend Accessor
 	switch t {
 	case typeVault:
-		backend, err = newVaultAccessor(conf.Name, *c.(*VaultConfig))
+		backend, err = newVaultAccessor(*c.(*VaultConfig))
 	case typeOpsman:
-		backend, err = newOmAccessor(conf.Name, *c.(*OmConfig))
+		backend, err = newOmAccessor(*c.(*OmConfig))
 	case typeCredhub:
-		backend, err = newConfigServerAccessor(conf.Name, *c.(*ConfigServerConfig))
+		backend, err = newConfigServerAccessor(*c.(*ConfigServerConfig))
 	case typeTLS:
-		backend, err = newTLSClientAccessor(conf.Name, *c.(*TLSClientConfig))
+		backend, err = newTLSClientAccessor(*c.(*TLSClientConfig))
 	}
 
 	return backend, err

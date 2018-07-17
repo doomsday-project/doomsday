@@ -25,7 +25,6 @@ type OmAccessor struct {
 	accessToken         string
 	refreshToken        string
 	isClientCredentials bool
-	name                string
 }
 
 type OmConfig struct {
@@ -55,7 +54,7 @@ func newOmClient(conf OmConfig) *http.Client {
 	}
 }
 
-func newOmAccessor(name string, conf OmConfig) (*OmAccessor, error) {
+func newOmAccessor(conf OmConfig) (*OmAccessor, error) {
 	u, err := url.Parse(conf.Address)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse target url: %s", err)
@@ -102,7 +101,6 @@ func newOmAccessor(name string, conf OmConfig) (*OmAccessor, error) {
 		refreshToken:        authResp.RefreshToken,
 		isClientCredentials: isClientCredentials,
 		URL:                 u,
-		name:                name,
 	}
 
 	go func() {
@@ -171,8 +169,6 @@ func (v *OmAccessor) List() (PathList, error) {
 
 	return finalPaths, nil
 }
-
-func (v *OmAccessor) Name() string { return v.name }
 
 func (v *OmAccessor) getDeployments() ([]string, error) {
 	path := fmt.Sprintf("/api/v0/deployed/products")

@@ -38,10 +38,15 @@ func Start(conf Config) error {
 			return fmt.Errorf("Error configuring backend `%s': %s", b.Name, err)
 		}
 
-		thisCore := doomsday.Core{Backend: thisBackend, BackendName: b.Name}
+		thisCore := doomsday.Core{Backend: thisBackend}
 		thisCore.SetCache(doomsday.NewCache())
 
-		sources = append(sources, source{Core: &thisCore, Interval: 30 * time.Minute})
+		backendName := b.Name
+		if backendName == "" {
+			b.Name = b.Type
+		}
+
+		sources = append(sources, source{Core: &thisCore, Name: backendName, Interval: 30 * time.Minute})
 	}
 
 	manager := newSourceManager(sources, logWriter)
