@@ -13,26 +13,30 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/thomasmmitchell/doomsday"
 	"github.com/thomasmmitchell/doomsday/server/auth"
+	"github.com/thomasmmitchell/doomsday/server/logger"
 	"github.com/thomasmmitchell/doomsday/storage"
 )
 
 func Start(conf Config) error {
 	var err error
 
-	logWriter := os.Stderr
+	log := logger.NewLogger(os.Stderr)
 	if conf.Server.LogFile != "" {
-		logWriter, err = os.OpenFile(conf.Server.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		var logTarget *os.File
+		logTarget, err = os.OpenFile(conf.Server.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return fmt.Errorf("Could not open log file for writing: %s", err)
 		}
+
+		log = logger.NewLogger(logTarget)
 	}
 
-	fmt.Fprintf(logWriter, "Initializing server\n")
-	fmt.Fprintf(logWriter, "Configuring targeted storage backends\n")
+	log.Write("Initializing server")
+	log.Write("Configuring targeted storage backends")
 
 	sources := make([]source, 0, len(conf.Backends))
 	for _, b := range conf.Backends {
-		fmt.Fprintf(logWriter, "Configuring backend `%s' of type `%s'\n", b.Name, b.Type)
+		log.Write("Configuring backend `%s' of type `%s'", b.Name, b.Type)
 		thisBackend, err := storage.NewAccessor(b.Type, b.Properties)
 		if err != nil {
 			return fmt.Errorf("Error configuring backend `%s': %s", b.Name, err)
@@ -55,12 +59,12 @@ func Start(conf Config) error {
 		)
 	}
 
-	manager := newSourceManager(sources, logWriter)
+	manager := newSourceManager(sources, log)
 	manager.BackgroundScheduler()
 
-	fmt.Fprintf(logWriter, "Began asynchronous cache population\n")
+	log.Write("Began asynchronous cache population")
+	log.Write("Configuring frontend authentication")
 
-	fmt.Fprintf(logWriter, "Configuring frontend authentication\n")
 	authorizer, err := auth.NewAuth(conf.Server.Auth)
 	if err != nil {
 		return err
@@ -73,7 +77,7 @@ func Start(conf Config) error {
 	router.HandleFunc("/v1/cache", auth(getCache(manager))).Methods("GET")
 	router.HandleFunc("/v1/cache/refresh", auth(refreshCache(manager))).Methods("POST")
 
-	fmt.Fprintf(logWriter, "Beginning listening on port %d\n", conf.Server.Port)
+	log.Write("Beginning listening on port %d", conf.Server.Port)
 
 	if conf.Server.TLS.Cert != "" || conf.Server.TLS.Key != "" {
 		err = listenAndServeTLS(&conf, router)

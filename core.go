@@ -3,7 +3,6 @@ package doomsday
 import (
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
 	"sync"
 
 	"github.com/thomasmmitchell/doomsday/storage"
@@ -13,6 +12,12 @@ type Core struct {
 	Backend   storage.Accessor
 	cache     *Cache
 	cacheLock sync.RWMutex
+}
+
+type PopulateStats struct {
+	NumPaths   int
+	NumSuccess int
+	NumCerts   int
 }
 
 func (b *Core) SetCache(c *Cache) {
@@ -26,24 +31,23 @@ func (b *Core) Cache() *Cache {
 	return b.cache
 }
 
-func (b *Core) Populate() error {
+func (b *Core) Populate() (*PopulateStats, error) {
 	newCache := NewCache()
 	paths, err := b.Backend.List()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	fmt.Printf("Found %d paths to look up\n", len(paths))
-	err = b.populateUsing(newCache, paths)
+	results, err := b.populateUsing(newCache, paths)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	b.SetCache(newCache)
-	return nil
+	return results, nil
 }
 
-func (b *Core) populateUsing(cache *Cache, paths storage.PathList) error {
+func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateStats, error) {
 	if cache == nil {
 		panic("Was given a nil cache")
 	}
@@ -57,18 +61,21 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) error {
 	close(queue)
 
 	doneChan := make(chan bool, numWorkers)
-	errChan := make(chan error, numWorkers)
+	errCount := 0
+	certCount := 0
 
 	fetch := func() {
 		for path := range queue {
 			secret, err := b.Backend.Get(path)
 			if err != nil {
-				errChan <- err
+				errCount++
+				continue
 			}
 
 			for _, v := range secret {
 				cert := parseCert(v)
 				if cert != nil {
+					certCount++
 					cache.Store(path,
 						CacheObject{
 							Subject:  cert.Subject,
@@ -88,25 +95,19 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) error {
 		go fetch()
 	}
 
-	var err error
 	numDone := 0
-	for {
-		select {
-		case <-doneChan:
-			numDone++
-			if numDone == numWorkers {
-				goto doneWaiting
-			}
-		case err = <-errChan:
-			goto doneWaiting
+	for range doneChan {
+		numDone++
+		if numDone == numWorkers {
+			break
 		}
 	}
-doneWaiting:
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return &PopulateStats{
+		NumPaths:   len(paths),
+		NumSuccess: len(paths) - errCount,
+		NumCerts:   certCount,
+	}, nil
 }
 
 func parseCert(c string) *x509.Certificate {

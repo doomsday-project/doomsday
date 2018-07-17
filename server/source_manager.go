@@ -1,13 +1,12 @@
 package server
 
 import (
-	"fmt"
-	"os"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/thomasmmitchell/doomsday"
+	"github.com/thomasmmitchell/doomsday/server/logger"
 )
 
 type source struct {
@@ -22,14 +21,15 @@ func (s *source) Bump() {
 	s.nextRun = time.Now().Add(s.Interval)
 }
 
-func (s *source) Refresh(mode string, logger *os.File) {
-	fmt.Fprintf(logger, "Running %s populate of `%s'\n", mode, s.Name)
+func (s *source) Refresh(mode string, log *logger.Logger) {
+	log.Write("Running %s populate of `%s'", mode, s.Name)
 	startedAt := time.Now()
-	err := s.Core.Populate()
+	results, err := s.Core.Populate()
 	if err != nil {
-		fmt.Fprintf(logger, "Error populating info from backend `%s': %s\n", s.Name, err)
+		log.Write("Error populating info from backend `%s': %s", s.Name, err)
 	}
-	fmt.Fprintf(logger, "Finished %s populate of `%s' after %s\n", mode, s.Name, time.Since(startedAt))
+	log.Write("Finished %s populate of `%s' after %s. %d/%d paths searched. %d certs found",
+		mode, s.Name, time.Since(startedAt), results.NumSuccess, results.NumPaths, results.NumCerts)
 }
 
 type sourceManager struct {
@@ -40,12 +40,12 @@ type sourceManager struct {
 	sources []source
 	queue   []*source
 	lock    sync.RWMutex
-	logger  *os.File
+	log     *logger.Logger
 }
 
-func newSourceManager(sources []source, logger *os.File) *sourceManager {
-	if logger == nil {
-		logger = os.Stderr
+func newSourceManager(sources []source, log *logger.Logger) *sourceManager {
+	if log == nil {
+		panic("No logger was given")
 	}
 
 	queue := make([]*source, 0, len(sources))
@@ -56,7 +56,7 @@ func newSourceManager(sources []source, logger *os.File) *sourceManager {
 	return &sourceManager{
 		sources: sources,
 		queue:   queue,
-		logger:  logger,
+		log:     log,
 	}
 }
 
@@ -80,7 +80,7 @@ func (s *sourceManager) BackgroundScheduler() {
 			s.lock.Unlock()
 
 			if shouldRun {
-				current.Refresh("scheduled", s.logger)
+				current.Refresh("scheduled", s.log)
 			}
 
 			s.lock.RLock()
@@ -136,7 +136,7 @@ func (s *sourceManager) RefreshAll() {
 		s.lock.Unlock()
 
 		if shouldRun {
-			current.Refresh("ad-hoc", s.logger)
+			current.Refresh("ad-hoc", s.log)
 		}
 	}
 }
