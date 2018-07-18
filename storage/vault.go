@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/cloudfoundry-community/vaultkv"
@@ -25,9 +26,17 @@ type VaultConfig struct {
 }
 
 func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
+	if !regexp.MustCompile("^.*://").MatchString(conf.Address) {
+		conf.Address = fmt.Sprintf("https://%s", conf.Address)
+	}
+
 	u, err := url.Parse(conf.Address)
 	if err != nil {
-		return nil, fmt.Errorf("Could not parse url (%s) in config: %s", u, err)
+		return nil, fmt.Errorf("Could not parse url (%s) in config: %s", conf.Address, err)
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("Unsupported URL scheme `%s'", u.Scheme)
 	}
 
 	if conf.BasePath == "" {
