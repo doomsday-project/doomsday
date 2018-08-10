@@ -7,12 +7,14 @@ import (
 	"strconv"
 
 	"github.com/thomasmmitchell/doomsday/server/auth"
+	"github.com/thomasmmitchell/doomsday/server/notify"
 	yaml "gopkg.in/yaml.v2"
 )
 
 type Config struct {
-	Backends []BackendConfig `yaml:"backends"`
-	Server   APIConfig       `yaml:"server"`
+	Backends      []BackendConfig `yaml:"backends"`
+	Server        APIConfig       `yaml:"server"`
+	Notifications notify.Config   `yaml:"notifications"`
 }
 
 type APIConfig struct {

@@ -113,6 +113,7 @@ type CacheItemFilter struct {
 	Within *time.Duration
 }
 
+//Filter only works if the given CacheItems is sorted by NotAfter
 func (c CacheItems) Filter(filter CacheItemFilter) CacheItems {
 	ret := make(CacheItems, 0, len(c))
 	for _, v := range c {

@@ -1,4 +1,4 @@
-package server
+package manager
 
 import (
 	"sort"
@@ -9,7 +9,7 @@ import (
 	"github.com/thomasmmitchell/doomsday/server/logger"
 )
 
-type source struct {
+type Source struct {
 	Core     *doomsday.Core
 	Name     string
 	Interval time.Duration
@@ -17,11 +17,11 @@ type source struct {
 }
 
 //Bump sets nextRun to now + interval
-func (s *source) Bump() {
+func (s *Source) Bump() {
 	s.nextRun = time.Now().Add(s.Interval)
 }
 
-func (s *source) Refresh(mode string, log *logger.Logger) {
+func (s *Source) Refresh(mode string, log *logger.Logger) {
 	log.Write("Running %s populate of `%s'", mode, s.Name)
 	startedAt := time.Now()
 	results, err := s.Core.Populate()
@@ -33,35 +33,35 @@ func (s *source) Refresh(mode string, log *logger.Logger) {
 		mode, s.Name, time.Since(startedAt), results.NumSuccess, results.NumPaths, results.NumCerts)
 }
 
-type sourceManager struct {
+type SourceManager struct {
 	//sources is a static view of the queue, such that the get calls don't need
 	// to sync with the populate calls. Otherwise, we would need to read-lock on
 	// get calls so that the order of the queue doesn't shift from underneath us
 	// as the async scheduler is running
-	sources []source
-	queue   []*source
+	sources []Source
+	queue   []*Source
 	lock    sync.RWMutex
 	log     *logger.Logger
 }
 
-func newSourceManager(sources []source, log *logger.Logger) *sourceManager {
+func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
 	if log == nil {
 		panic("No logger was given")
 	}
 
-	queue := make([]*source, 0, len(sources))
+	queue := make([]*Source, 0, len(sources))
 	for i := range sources {
 		queue = append(queue, &sources[i])
 	}
 
-	return &sourceManager{
+	return &SourceManager{
 		sources: sources,
 		queue:   queue,
 		log:     log,
 	}
 }
 
-func (s *sourceManager) BackgroundScheduler() {
+func (s *SourceManager) BackgroundScheduler() {
 	if len(s.sources) == 0 {
 		return
 	}
@@ -92,7 +92,7 @@ func (s *sourceManager) BackgroundScheduler() {
 	}()
 }
 
-func (s *sourceManager) sortQueue() {
+func (s *SourceManager) sortQueue() {
 	//This is a naive sort when only one thing can change order. Also, we should
 	//be using a linked-list heap for performance. But considering that the number
 	//of backends will be in the single digits... I really don't care about either
@@ -105,7 +105,7 @@ func (s *sourceManager) sortQueue() {
 	)
 }
 
-func (s *sourceManager) Data() []doomsday.CacheItem {
+func (s *SourceManager) Data() doomsday.CacheItems {
 	items := []doomsday.CacheItem{}
 	for _, source := range s.sources {
 		data := source.Core.Cache().Map()
@@ -119,10 +119,11 @@ func (s *sourceManager) Data() []doomsday.CacheItem {
 		}
 	}
 
+	sort.Slice(items, func(i, j int) bool { return items[i].NotAfter < items[j].NotAfter })
 	return items
 }
 
-func (s *sourceManager) RefreshAll() {
+func (s *SourceManager) RefreshAll() {
 	//How long must have passed before we'll refresh a backend by request to avoid spamming
 	const tooRecentThreshold time.Duration = time.Minute
 	for _, current := range s.sources {

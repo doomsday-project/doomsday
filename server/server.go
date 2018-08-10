@@ -14,6 +14,8 @@ import (
 	"github.com/thomasmmitchell/doomsday"
 	"github.com/thomasmmitchell/doomsday/server/auth"
 	"github.com/thomasmmitchell/doomsday/server/logger"
+	"github.com/thomasmmitchell/doomsday/server/manager"
+	"github.com/thomasmmitchell/doomsday/server/notify"
 	"github.com/thomasmmitchell/doomsday/storage"
 )
 
@@ -34,7 +36,7 @@ func Start(conf Config) error {
 	log.Write("Initializing server")
 	log.Write("Configuring targeted storage backends")
 
-	sources := make([]source, 0, len(conf.Backends))
+	sources := make([]manager.Source, 0, len(conf.Backends))
 	for _, b := range conf.Backends {
 		log.Write("Configuring backend `%s' of type `%s'", b.Name, b.Type)
 		thisBackend, err := storage.NewAccessor(b.Type, b.Properties)
@@ -51,7 +53,7 @@ func Start(conf Config) error {
 		}
 
 		sources = append(sources,
-			source{
+			manager.Source{
 				Core:     &thisCore,
 				Name:     backendName,
 				Interval: time.Duration(b.RefreshInterval) * time.Minute,
@@ -59,7 +61,7 @@ func Start(conf Config) error {
 		)
 	}
 
-	manager := newSourceManager(sources, log)
+	manager := manager.NewSourceManager(sources, log)
 	manager.BackgroundScheduler()
 
 	log.Write("Began asynchronous cache population")
@@ -68,6 +70,15 @@ func Start(conf Config) error {
 	authorizer, err := auth.NewAuth(conf.Server.Auth)
 	if err != nil {
 		return err
+	}
+
+	if conf.Notifications.Schedule.Type != "" {
+		err = notify.NotifyFrom(conf.Notifications, manager, log)
+		if err != nil {
+			return fmt.Errorf("Error setting up notifications: %s", err)
+		}
+
+		log.Write("Notifications configured")
 	}
 
 	auth := authorizer.TokenHandler()
@@ -127,7 +138,7 @@ func getInfo(authType auth.AuthType) func(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func getCache(manager *sourceManager) func(w http.ResponseWriter, r *http.Request) {
+func getCache(manager *manager.SourceManager) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		items := manager.Data()
 		sort.Slice(items, func(i, j int) bool { return items[i].NotAfter < items[j].NotAfter })
@@ -143,7 +154,7 @@ func getCache(manager *sourceManager) func(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func refreshCache(manager *sourceManager) func(w http.ResponseWriter, r *http.Request) {
+func refreshCache(manager *manager.SourceManager) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		go manager.RefreshAll()
 		w.WriteHeader(204)
