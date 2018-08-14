@@ -15,6 +15,7 @@ type Schedule interface {
 const (
 	typeUnknown int = iota
 	typeConstant
+	typeCron
 )
 
 func New(scheduleType string, conf map[string]interface{}) (Schedule, error) {
@@ -34,6 +35,9 @@ func New(scheduleType string, conf map[string]interface{}) (Schedule, error) {
 	case typeConstant:
 		c = &ConstantConfig{}
 		err = yaml.Unmarshal(properties, c.(*ConstantConfig))
+	case typeCron:
+		c = &CronConfig{}
+		err = yaml.Unmarshal(properties, c.(*CronConfig))
 	}
 
 	if err != nil {
@@ -44,6 +48,8 @@ func New(scheduleType string, conf map[string]interface{}) (Schedule, error) {
 	switch t {
 	case typeConstant:
 		schedule, err = newConstantSchedule(*c.(*ConstantConfig))
+	case typeCron:
+		schedule, err = newCronSchedule(*c.(*CronConfig))
 	}
 
 	return schedule, err
@@ -53,6 +59,8 @@ func resolveType(t string) int {
 	switch t {
 	case "constant", "interval":
 		return typeConstant
+	case "cron", "cronspec":
+		return typeCron
 	default:
 		return typeUnknown
 	}
