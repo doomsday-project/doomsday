@@ -397,10 +397,22 @@
 			"revisionTime": "2015-08-24T21:28:02Z"
 		},
 		{
+			"checksumSHA1": "kXclqYWCr4uIyByXHvv0+MXQ48c=",
+			"path": "github.com/robfig/cron",
+			"revision": "b41be1df696709bb6395fe435af20370037c0b4c",
+			"revisionTime": "2018-05-05T20:34:41Z"
+		},
+		{
 			"checksumSHA1": "Ihjzbr/T5oT+krNnMDFSCKLlaW8=",
 			"path": "github.com/starkandwayne/goutils/ansi",
 			"revision": "2c96629058fe59038b1f090194d047ecf0194045",
 			"revisionTime": "2017-07-19T17:38:05Z"
+		},
+		{
+			"checksumSHA1": "6VcMDma2R3Qzu1ginMZaWT0gBxQ=",
+			"path": "github.com/thomasmmitchell/go-shout",
+			"revision": "ac0b45a970dabe1c2e2d51d359bb58340c7f8e4e",
+			"revisionTime": "2018-08-22T16:09:43Z"
 		},
 		{
 			"checksumSHA1": "IQkUIOnvlf0tYloFx9mLaXSvXWQ=",
