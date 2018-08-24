@@ -12,6 +12,11 @@ type Schedule interface {
 	Channel() chan bool
 }
 
+type Config struct {
+	Type       string                 `yaml:"type"`
+	Properties map[string]interface{} `yaml:"properties"`
+}
+
 const (
 	typeUnknown int = iota
 	typeConstant

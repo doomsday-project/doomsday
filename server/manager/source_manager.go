@@ -22,14 +22,14 @@ func (s *Source) Bump() {
 }
 
 func (s *Source) Refresh(mode string, log *logger.Logger) {
-	log.Write("Running %s populate of `%s'", mode, s.Name)
+	log.WriteF("Running %s populate of `%s'", mode, s.Name)
 	startedAt := time.Now()
 	results, err := s.Core.Populate()
 	if err != nil {
-		log.Write("Error populating info from backend `%s': %s", s.Name, err)
+		log.WriteF("Error populating info from backend `%s': %s", s.Name, err)
 		return
 	}
-	log.Write("Finished %s populate of `%s' after %s. %d/%d paths searched. %d certs found",
+	log.WriteF("Finished %s populate of `%s' after %s. %d/%d paths searched. %d certs found",
 		mode, s.Name, time.Since(startedAt), results.NumSuccess, results.NumPaths, results.NumCerts)
 }
 

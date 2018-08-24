@@ -14,7 +14,11 @@ func NewLogger(f *os.File) *Logger {
 	return &Logger{f: f}
 }
 
-func (l *Logger) Write(s string, a ...interface{}) {
+func (l *Logger) WriteF(s string, a ...interface{}) {
 	timestamp := time.Now().Format(time.Stamp)
-	fmt.Fprintf(l.f, fmt.Sprintf("%s: %s\n", timestamp, s), a...)
+	l.Write([]byte(fmt.Sprintf(fmt.Sprintf("%s: %s\n", timestamp, s), a...)))
+}
+
+func (l *Logger) Write(b []byte) (int, error) {
+	return fmt.Fprintf(l.f, "%s", b)
 }

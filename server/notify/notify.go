@@ -12,20 +12,9 @@ import (
 )
 
 type Config struct {
-	Backend     BackendConfig  `yaml:"backend"`
-	Schedule    ScheduleConfig `yaml:"schedule"`
-	DoomsdayURL string         `yaml:"doomsday_url"`
-	ShowOK      bool           `yaml:"notify_if_ok"`
-}
-
-type BackendConfig struct {
-	Type       string                 `yaml:"type"`
-	Properties map[string]interface{} `yaml:"properties"`
-}
-
-type ScheduleConfig struct {
-	Type       string                 `yaml:"type"`
-	Properties map[string]interface{} `yaml:"properties"`
+	Backend     backend.Config  `yaml:"backend"`
+	Schedule    schedule.Config `yaml:"schedule"`
+	DoomsdayURL string          `yaml:"doomsday_url"`
 }
 
 type notifier struct {
@@ -45,7 +34,11 @@ func NotifyFrom(conf Config, m *manager.SourceManager, l *logger.Logger) error {
 		return fmt.Errorf("Error creating schedule: %s", err)
 	}
 
-	n.b, err = backend.New(conf.Backend.Type, conf.Backend.Properties)
+	uni := backend.BackendUniversalConfig{
+		DoomsdayURL: conf.DoomsdayURL,
+		Logger:      l,
+	}
+	n.b, err = backend.New(conf.Backend, uni)
 	if err != nil {
 		return fmt.Errorf("Error creating backend: %s", err)
 	}
@@ -53,7 +46,7 @@ func NotifyFrom(conf Config, m *manager.SourceManager, l *logger.Logger) error {
 	n.s.Start()
 	go func() {
 		for range n.s.Channel() {
-			l.Write("Triggering notification check")
+			l.WriteF("Triggering notification check")
 			const (
 				StateOK = iota
 				StateExpired
@@ -73,28 +66,17 @@ func NotifyFrom(conf Config, m *manager.SourceManager, l *logger.Logger) error {
 			var sendErr error
 			switch state {
 			case StateOK:
-				l.Write("No expiring certs")
-				if conf.ShowOK {
-					sendErr = n.b.Send(backend.Message{
-						backend.MText{Text: "No tracked certs are expiring soon. For detailed information, check out the doomsday at "},
-						backend.MLink{Link: conf.DoomsdayURL},
-					})
-				}
+				l.WriteF("No expiring certs")
+				sendErr = n.b.OK()
 			case StateSoon:
-				l.Write("Certs expiring soon")
-				sendErr = n.b.Send(backend.Message{
-					backend.MText{Text: "WARNING: You have certs expiring soon! For detailed information, check out the doomsday at "},
-					backend.MLink{Link: conf.DoomsdayURL},
-				})
+				l.WriteF("Certs expiring soon")
+				sendErr = n.b.Soon()
 			case StateExpired:
-				l.Write("Certs expired")
-				sendErr = n.b.Send(backend.Message{
-					backend.MText{Text: "AHHH! You have expired certs! For detailed information, check out the doomsday at "},
-					backend.MLink{Link: conf.DoomsdayURL},
-				})
+				l.WriteF("Certs expired")
+				sendErr = n.b.Expired()
 			}
 			if sendErr != nil {
-				l.Write("Could not send notification: %s", sendErr)
+				l.WriteF("Could not send notification: %s", sendErr)
 			}
 		}
 	}()

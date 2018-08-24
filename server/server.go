@@ -33,12 +33,12 @@ func Start(conf Config) error {
 		log = logger.NewLogger(logTarget)
 	}
 
-	log.Write("Initializing server")
-	log.Write("Configuring targeted storage backends")
+	log.WriteF("Initializing server")
+	log.WriteF("Configuring targeted storage backends")
 
 	sources := make([]manager.Source, 0, len(conf.Backends))
 	for _, b := range conf.Backends {
-		log.Write("Configuring backend `%s' of type `%s'", b.Name, b.Type)
+		log.WriteF("Configuring backend `%s' of type `%s'", b.Name, b.Type)
 		thisBackend, err := storage.NewAccessor(b.Type, b.Properties)
 		if err != nil {
 			return fmt.Errorf("Error configuring backend `%s': %s", b.Name, err)
@@ -64,8 +64,8 @@ func Start(conf Config) error {
 	manager := manager.NewSourceManager(sources, log)
 	manager.BackgroundScheduler()
 
-	log.Write("Began asynchronous cache population")
-	log.Write("Configuring frontend authentication")
+	log.WriteF("Began asynchronous cache population")
+	log.WriteF("Configuring frontend authentication")
 
 	authorizer, err := auth.NewAuth(conf.Server.Auth)
 	if err != nil {
@@ -78,7 +78,7 @@ func Start(conf Config) error {
 			return fmt.Errorf("Error setting up notifications: %s", err)
 		}
 
-		log.Write("Notifications configured")
+		log.WriteF("Notifications configured")
 	}
 
 	auth := authorizer.TokenHandler()
@@ -88,7 +88,7 @@ func Start(conf Config) error {
 	router.HandleFunc("/v1/cache", auth(getCache(manager))).Methods("GET")
 	router.HandleFunc("/v1/cache/refresh", auth(refreshCache(manager))).Methods("POST")
 
-	log.Write("Beginning listening on port %d", conf.Server.Port)
+	log.WriteF("Beginning listening on port %d", conf.Server.Port)
 
 	if conf.Server.TLS.Cert != "" || conf.Server.TLS.Key != "" {
 		err = listenAndServeTLS(&conf, router)

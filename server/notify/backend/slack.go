@@ -10,14 +10,17 @@ import (
 )
 
 type SlackConfig struct {
-	Webhook string `yaml:"webhook"`
+	Webhook  string `yaml:"webhook"`
+	NotifyOK bool   `yaml:"notify_ok"`
 }
 
 type Slack struct {
-	webhook string
+	webhook  string
+	topic    string
+	notifyOK bool
 }
 
-func newSlackBackend(c SlackConfig) (*Slack, error) {
+func newSlackBackend(c SlackConfig, uni BackendUniversalConfig) (*Slack, error) {
 	if c.Webhook == "" {
 		return nil, fmt.Errorf("No webhook provided")
 	}
@@ -25,24 +28,32 @@ func newSlackBackend(c SlackConfig) (*Slack, error) {
 	if _, err := url.Parse(c.Webhook); err != nil {
 		return nil, fmt.Errorf("Webhook not parsable as URL")
 	}
-	return &Slack{webhook: c.Webhook}, nil
+	return &Slack{
+		webhook: c.Webhook,
+		topic:   fmt.Sprintf("%s<%s>%s", slackQuoteMeta("doomsday: ("), uni.Logger, "): "),
+	}, nil
 }
 
-func (s Slack) Send(m Message) error {
-	var toSend string
-	for _, v := range m {
-		switch part := v.(type) {
-		case MText:
-			toSend += s.quoteMeta(part.Text)
-		case MLink:
-			if part.Text == "" {
-				part.Text = part.Link
-			}
-			toSend += fmt.Sprintf("<%s|%s>", part.Link, s.quoteMeta(part.Text))
-		}
+func (s Slack) OK() error {
+	var err error
+	if s.notifyOK {
+		err = s.send(msgOK)
 	}
+	return err
+}
 
-	body, err := json.Marshal(&map[string]string{"text": toSend})
+func (s Slack) Soon() error {
+	return s.send(msgSoon)
+}
+
+func (s Slack) Expired() error {
+	return s.send(msgExpired)
+}
+
+func (s Slack) send(msg string) error {
+	body, err := json.Marshal(&map[string]string{
+		"text": s.topic + slackQuoteMeta(msg),
+	})
 	if err != nil {
 		panic("We tried to send a nil message")
 	}
@@ -64,7 +75,7 @@ func (s Slack) Send(m Message) error {
 	return nil
 }
 
-func (Slack) quoteMeta(s string) string {
+func slackQuoteMeta(s string) string {
 	s = strings.Replace(s, "&", "&amp;", -1)
 	s = strings.Replace(s, "<", "&lt;", -1)
 	s = strings.Replace(s, ">", "&gt;", -1)
