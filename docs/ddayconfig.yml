@@ -131,3 +131,49 @@ server:
       # the configured timeout when it is used, so long as it is used while
       # still valid.
       refresh: true
+
+notifications:
+  # (string) The external URL for this doomsday server. It will be included in
+  # notification messages
+  doomsday_url: http://toms.laptop
+
+  # (hash) A notification backend is something that receives notifications
+  backend:
+    # (string, enum) The type of notification backend.
+    # Acceptable values are slack or shout.
+    # Slack is... well.. Slack (slack.com)
+    # Shout is github.com/jhunt/shout, a man-in-the-middle notification handler
+    type: shout
+    # (hash) backend-type specific notification options
+    properties:
+      # (string) The url of the shout server
+      url: "http://localhost:7109"
+      # (string) The username to authenticate to the shout server with
+      username: admin
+      # (string) The password to authenticate to the shout server with
+      password: password
+      # (string) The topic to notify for (this is an identifier for this doomsday server in shout)
+      topic: doomsday
+    ## Notifications through incoming webhooks to Slack.
+    #type: slack
+    #properties:
+    #  # (string) The incoming webhook to send the notifications to
+    #  webhook: https://hooks.slack.com/services/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
+    #  # (bool) Whether to send notifications when there are no certs expiring soon
+    #  notify_ok: false
+
+  # (hash) A schedule for when to check/send notifications
+  schedule:
+    # (string, enum) The type of notification schedule.
+    # Acceptable values are constant and cron
+    # constant is effectively "every x minutes"
+    # cron is based on cron schedules, allowing for more complex notification intervals
+    type: constant
+    # (hash) schedule-type-specific properties
+    properties:
+      # (number) The number of minutes to wait between notifications
+      interval: 30
+    #type: cron
+    #properties:
+    #  # A crontab spec, in the form of minute, hour, day of month, month, and day of week
+    #  spec: * 12 * * *
