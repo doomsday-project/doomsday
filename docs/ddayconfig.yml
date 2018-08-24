@@ -11,12 +11,15 @@
 #   "credhub", and "tlsclient".
 # name: (string) Attached to objects returned from the doomsday API to
 #   identify where each item came from. Defaults to the backend `type` string.
+# refresh_interval: (number) How many minutes between refreshing information from
+#   this backend. Defaults to 30
 # properties (hash): Backend-specific. You should look below for how to
 #   configure each one.
 backends:
 # Hashicorp's Vault. https://www.vaultproject.io/
 - type: vault
   name: myvault
+  refresh_interval: 30
   properties:
     # (string) The URL where the Vault API is located
     address: https://127.0.0.1:443
