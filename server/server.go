@@ -38,6 +38,11 @@ func Start(conf Config) error {
 
 	sources := make([]manager.Source, 0, len(conf.Backends))
 	for _, b := range conf.Backends {
+		backendName := b.Name
+		if backendName == "" {
+			backendName = b.Type
+		}
+
 		log.WriteF("Configuring backend `%s' of type `%s'", b.Name, b.Type)
 		thisBackend, err := storage.NewAccessor(b.Type, b.Properties)
 		if err != nil {
@@ -46,11 +51,6 @@ func Start(conf Config) error {
 
 		thisCore := doomsday.Core{Backend: thisBackend}
 		thisCore.SetCache(doomsday.NewCache())
-
-		backendName := b.Name
-		if backendName == "" {
-			b.Name = b.Type
-		}
 
 		sources = append(sources,
 			manager.Source{
