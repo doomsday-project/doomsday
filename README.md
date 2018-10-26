@@ -1,5 +1,11 @@
 # Doomsday
 
+Doomsday is a server (and also a CLI) which can be configured to track
+certificates from different storage backends (Vault, Credhub, Pivotal
+Ops Manager, or actual websites) and provide a tidy view into when certificates
+will expire. Doomsday provides no automation for renewal - Doomsday simply
+provides the information required for maintainers to take action.
+
 ## Server configuration
 
 Create a configuration manifest and start the server against it with
