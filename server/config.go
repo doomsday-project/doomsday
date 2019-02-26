@@ -25,6 +25,9 @@ type APIConfig struct {
 		Key  string `yaml:"key"`
 	} `yaml:"tls"`
 	Auth auth.Config `yaml:"auth"`
+	Dev  struct {
+		Mappings map[string]string `yaml:"mappings"`
+	} `yaml:"dev"`
 }
 
 type BackendConfig struct {

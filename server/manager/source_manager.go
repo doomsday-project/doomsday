@@ -11,7 +11,6 @@ import (
 
 type Source struct {
 	Core     *doomsday.Core
-	Name     string
 	Interval time.Duration
 	nextRun  time.Time
 }
@@ -21,16 +20,33 @@ func (s *Source) Bump() {
 	s.nextRun = time.Now().Add(s.Interval)
 }
 
-func (s *Source) Refresh(mode string, log *logger.Logger) {
-	log.WriteF("Running %s populate of `%s'", mode, s.Name)
+func (s *Source) Refresh(global *doomsday.Cache, mode string, log *logger.Logger) {
+	log.WriteF("Running %s populate of `%s'", mode, s.Core.Name)
 	startedAt := time.Now()
+	old := s.Core.Cache()
+	if old == nil {
+		old = doomsday.NewCache()
+	}
 	results, err := s.Core.Populate()
 	if err != nil {
-		log.WriteF("Error populating info from backend `%s': %s", s.Name, err)
+		log.WriteF("Error populating info from backend `%s': %s", s.Core.Name, err)
 		return
 	}
+	log.WriteF("Printing %s map", s.Core.Name)
+	log.WriteF("")
+	for k, v := range s.Core.Cache().Map() {
+		log.WriteF("%x -> %+v", k, v)
+	}
+
+	global.ApplyDiff(old, s.Core.Cache())
 	log.WriteF("Finished %s populate of `%s' after %s. %d/%d paths searched. %d certs found",
-		mode, s.Name, time.Since(startedAt), results.NumSuccess, results.NumPaths, results.NumCerts)
+		mode, s.Core.Name, time.Since(startedAt), results.NumSuccess, results.NumPaths, results.NumCerts)
+
+	log.WriteF("Printing global map")
+	log.WriteF("")
+	for k, v := range global.Map() {
+		log.WriteF("%x -> %+v", k, v)
+	}
 }
 
 type SourceManager struct {
@@ -42,6 +58,7 @@ type SourceManager struct {
 	queue   []*Source
 	lock    sync.RWMutex
 	log     *logger.Logger
+	global  *doomsday.Cache
 }
 
 func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
@@ -58,6 +75,7 @@ func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
 		sources: sources,
 		queue:   queue,
 		log:     log,
+		global:  doomsday.NewCache(),
 	}
 }
 
@@ -81,7 +99,7 @@ func (s *SourceManager) BackgroundScheduler() {
 			s.lock.Unlock()
 
 			if shouldRun {
-				current.Refresh("scheduled", s.log)
+				current.Refresh(s.global, "scheduled", s.log)
 			}
 
 			s.lock.RLock()
@@ -107,16 +125,19 @@ func (s *SourceManager) sortQueue() {
 
 func (s *SourceManager) Data() doomsday.CacheItems {
 	items := []doomsday.CacheItem{}
-	for _, source := range s.sources {
-		data := source.Core.Cache().Map()
-		for k, v := range data {
-			items = append(items, doomsday.CacheItem{
-				BackendName: source.Name,
-				Path:        k,
-				CommonName:  v.Subject.CommonName,
-				NotAfter:    v.NotAfter.Unix(),
+	for _, v := range s.global.Map() {
+		paths := []doomsday.CacheItemPath{}
+		for _, path := range v.Paths {
+			paths = append(paths, doomsday.CacheItemPath{
+				Backend:  path.Source,
+				Location: path.Location,
 			})
 		}
+		items = append(items, doomsday.CacheItem{
+			Paths:      paths,
+			CommonName: v.Subject.CommonName,
+			NotAfter:   v.NotAfter.Unix(),
+		})
 	}
 
 	sort.Slice(items, func(i, j int) bool { return items[i].NotAfter < items[j].NotAfter })
@@ -138,7 +159,7 @@ func (s *SourceManager) RefreshAll() {
 		s.lock.Unlock()
 
 		if shouldRun {
-			current.Refresh("ad-hoc", s.log)
+			current.Refresh(s.global, "ad-hoc", s.log)
 		}
 	}
 }

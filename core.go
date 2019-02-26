@@ -1,8 +1,10 @@
 package doomsday
 
 import (
+	"crypto/sha1"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"runtime"
 	"sync"
 
@@ -11,6 +13,7 @@ import (
 
 type Core struct {
 	Backend   storage.Accessor
+	Name      string
 	cache     *Cache
 	cacheLock sync.RWMutex
 }
@@ -79,19 +82,23 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateSta
 				continue
 			}
 
-			for _, v := range secret {
-				cert := parseCert(v)
-				if cert != nil {
+			for k, v := range secret {
+				certs := parseCert(v)
+				for _, cert := range certs {
 					myCertCount++
-					cache.Store(path,
+					cache.Merge(
+						fmt.Sprintf("%s", sha1.Sum(cert.Raw)),
 						CacheObject{
 							Subject:  cert.Subject,
 							NotAfter: cert.NotAfter,
+							Paths: []PathObject{
+								{
+									Location: path + ":" + k,
+									Source:   b.Name,
+								},
+							},
 						},
 					)
-					//Don't get multiple certs from within the same secret - they're probably
-					// the same one
-					break
 				}
 			}
 			mySuccessCount++
@@ -116,8 +123,8 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateSta
 	}, nil
 }
 
-func parseCert(c string) *x509.Certificate {
-	certChain := []*x509.Certificate{}
+func parseCert(c string) []*x509.Certificate {
+	certs := []*x509.Certificate{}
 	//Populate a potential chain of certs (or even just one) into this here slice
 	var pemBlock *pem.Block
 	var rest = []byte(c)
@@ -137,42 +144,11 @@ func parseCert(c string) *x509.Certificate {
 			continue
 		}
 
-		certChain = append(certChain, cert)
+		certs = append(certs, cert)
 		if len(rest) == 0 {
 			break
 		}
 	}
 
-	return getLeafCert(certChain)
-}
-
-//I'm assuming that given a cert chain, the chain is either from server to
-//highest intermediate/root CA, or in the reverse order. You know - not just
-//some random smattering of certs, because that doesn't work with anything I
-//know of. Therefore, I check the first two certs in the chain
-//for signature direction to try to determine which is the server cert, and
-//then return only that. If the thing that signed it is in the chain and we
-//can actually control it, its probably somewhere else in the storage and
-//it'll be caught at another key.
-func getLeafCert(chain []*x509.Certificate) *x509.Certificate {
-	if len(chain) == 0 {
-		return nil
-	}
-
-	//This applies if the chain is len 1, or if the chain is leaf to root
-	ret := chain[0]
-
-	if len(chain) > 1 {
-		//Check if the first cert signed the second cert
-		rootToLeaf := chain[0].CheckSignature(
-			chain[1].SignatureAlgorithm,
-			chain[1].RawTBSCertificate,
-			chain[1].Signature) == nil
-
-		if rootToLeaf {
-			ret = chain[len(chain)-1]
-		}
-	}
-
-	return ret
+	return certs
 }

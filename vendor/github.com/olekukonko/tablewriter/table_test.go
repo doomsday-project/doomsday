@@ -196,7 +196,7 @@ func TestNoBorder(t *testing.T) {
   1/4/2014 | February Extra Bandwidth |  2233 | $30.00   
   1/4/2014 |     (Discount)           |  2233 | -$1.00   
 +----------+--------------------------+-------+---------+
-                                        TOTAL | $145 93  
+                                        TOTAL | $145.93  
                                       +-------+---------+
 `
 
@@ -232,7 +232,7 @@ func TestWithBorder(t *testing.T) {
 | 1/4/2014 | February Extra Bandwidth |  2233 | $30.00  |
 | 1/4/2014 |     (Discount)           |  2233 | -$1.00  |
 +----------+--------------------------+-------+---------+
-|                                       TOTAL | $145 93 |
+|                                       TOTAL | $145.93 |
 +----------+--------------------------+-------+---------+
 `
 
@@ -401,7 +401,7 @@ func TestPrintCaptionWithFooter(t *testing.T) {
   1/4/2014 | February Hosting         |  2233 | $51.00   
   1/4/2014 | February Extra Bandwidth |  2233 | $30.00   
 +----------+--------------------------+-------+---------+
-                                        TOTAL | $146 93  
+                                        TOTAL | $146.93  
                                       +-------+---------+
 This is a very long caption. The text should wrap to the
 width of the table.
@@ -872,7 +872,7 @@ func TestClearRows(t *testing.T) {
 +----------+-------------+-------+---------+
 | 1/1/2014 | Domain name |  2233 | $10.98  |
 +----------+-------------+-------+---------+
-|                          TOTAL | $145 93 |
+|                          TOTAL | $145.93 |
 +----------+-------------+-------+---------+
 `
 	want := originalWant
@@ -887,7 +887,7 @@ func TestClearRows(t *testing.T) {
 |   DATE   | DESCRIPTION |  CV2  | AMOUNT  |
 +----------+-------------+-------+---------+
 +----------+-------------+-------+---------+
-|                          TOTAL | $145 93 |
+|                          TOTAL | $145.93 |
 +----------+-------------+-------+---------+
 `
 
@@ -902,7 +902,7 @@ func TestClearRows(t *testing.T) {
 +----------+-------------+-------+---------+
 | 1/1/2014 | Domain name |  2233 | $10.98  |
 +----------+-------------+-------+---------+
-|                          TOTAL | $145 93 |
+|                          TOTAL | $145.93 |
 +----------+-------------+-------+---------+
 `
 
@@ -1024,6 +1024,34 @@ func TestWrapString(t *testing.T) {
 	checkEqual(t, got, want)
 }
 
+func TestNumberAlign(t *testing.T) {
+	var (
+		buf   = &bytes.Buffer{}
+		table = NewWriter(buf)
+		data  = [][]string{
+			{"AAAAAAAAAAAAA", "BBBBBBBBBBBBB", "CCCCCCCCCCCCCC"},
+			{"A", "B", "C"},
+			{"123456789", "2", "3"},
+			{"1", "2", "123,456,789"},
+			{"1", "123,456.789", "3"},
+			{"-123,456", "-2", "-3"},
+		}
+		want = `+---------------+---------------+----------------+
+| AAAAAAAAAAAAA | BBBBBBBBBBBBB | CCCCCCCCCCCCCC |
+| A             | B             | C              |
+|     123456789 |             2 |              3 |
+|             1 |             2 |    123,456,789 |
+|             1 |   123,456.789 |              3 |
+|      -123,456 |            -2 |             -3 |
++---------------+---------------+----------------+
+`
+	)
+	table.AppendBulk(data)
+	table.Render()
+
+	checkEqual(t, buf.String(), want)
+}
+
 func TestCustomAlign(t *testing.T) {
 	var (
 		buf    = &bytes.Buffer{}
@@ -1052,4 +1080,42 @@ func TestCustomAlign(t *testing.T) {
 	table.Render()
 
 	checkEqual(t, buf.String(), want)
+}
+
+func TestTitle(t *testing.T) {
+	ts := []struct {
+		text string
+		want string
+	}{
+		{"", ""},
+		{"foo", "FOO"},
+		{"Foo", "FOO"},
+		{"foO", "FOO"},
+		{".foo", "FOO"},
+		{"foo.", "FOO"},
+		{".foo.", "FOO"},
+		{".foo.bar.", "FOO BAR"},
+		{"_foo", "FOO"},
+		{"foo_", "FOO"},
+		{"_foo_", "FOO"},
+		{"_foo_bar_", "FOO BAR"},
+		{" foo", "FOO"},
+		{"foo ", "FOO"},
+		{" foo ", "FOO"},
+		{" foo bar ", "FOO BAR"},
+		{"0.1", "0.1"},
+		{"FOO 0.1", "FOO 0.1"},
+		{".1 0.1", ".1 0.1"},
+		{"1. 0.1", "1. 0.1"},
+		{"1. 0.", "1. 0."},
+		{".1. 0.", ".1. 0."},
+		{".$ . $.", "$ . $"},
+		{".$. $.", "$  $"},
+	}
+	for _, tt := range ts {
+		got := Title(tt.text)
+		if got != tt.want {
+			t.Errorf("want %q, bot got %q", tt.want, got)
+		}
+	}
 }

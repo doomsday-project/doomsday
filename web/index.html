@@ -1,0 +1,38 @@
+<html>
+<head>
+	<title>Doomsday</title>
+  <link rel='stylesheet' type='text/css' href='web/assets/stylesheet.css'></link>
+</head>
+<body>
+	<div id="certs"></div>
+	<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+	<script src="web/assets/lens.js"></script>
+	<script type="text/html" id="template:cert_list">
+		<table>
+		<tr>
+			<th>Common Name</th>
+			<th>Not After</th>
+		</tr>
+		[[ _.certs.forEach(function(v) { ]]
+			<tr>
+				<td>[[= v.common_name ]]</td>
+				<td>[[= v.not_after ]]</td>
+			</tr>
+		[[ }); ]]
+		</table>
+	</script>
+	<script>
+		$(document).ready(function(){
+			$.ajax({
+				method: "GET",
+				url: "/v1/cache",
+				dataType: "json",
+				success: function(data) {
+					$("#certs").template("cert_list", { certs: data.content })
+					$("#certs").show()
+				}
+			})
+		});
+	</script>
+</body>
+</html>

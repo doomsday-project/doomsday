@@ -4,10 +4,12 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -49,13 +51,12 @@ func Start(conf Config) error {
 			return fmt.Errorf("Error configuring backend `%s': %s", b.Name, err)
 		}
 
-		thisCore := doomsday.Core{Backend: thisBackend}
+		thisCore := doomsday.Core{Backend: thisBackend, Name: backendName}
 		thisCore.SetCache(doomsday.NewCache())
 
 		sources = append(sources,
 			manager.Source{
 				Core:     &thisCore,
-				Name:     backendName,
 				Interval: time.Duration(b.RefreshInterval) * time.Minute,
 			},
 		)
@@ -87,6 +88,12 @@ func Start(conf Config) error {
 	router.HandleFunc("/v1/auth", authorizer.LoginHandler()).Methods("POST")
 	router.HandleFunc("/v1/cache", auth(getCache(manager))).Methods("GET")
 	router.HandleFunc("/v1/cache/refresh", auth(refreshCache(manager))).Methods("POST")
+
+	for file, servePath := range conf.Server.Dev.Mappings {
+		servePath = "/" + strings.TrimPrefix(servePath, "/")
+		log.WriteF("Serving %s at %s", file, servePath)
+		router.HandleFunc(servePath, serveFile(file)).Methods("GET")
+	}
 
 	log.WriteF("Beginning listening on port %d", conf.Server.Port)
 
@@ -158,5 +165,25 @@ func refreshCache(manager *manager.SourceManager) func(w http.ResponseWriter, r 
 	return func(w http.ResponseWriter, r *http.Request) {
 		go manager.RefreshAll()
 		w.WriteHeader(204)
+	}
+}
+
+func serveFile(filepath string) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		f, err := os.Open(filepath)
+		if err != nil {
+			w.WriteHeader(500)
+			w.Write([]byte(fmt.Sprintf("Could not serve file: %s", filepath)))
+		}
+
+		contents, err := ioutil.ReadAll(f)
+		if err != nil {
+			w.WriteHeader(500)
+			w.Write([]byte("Could not read contents of file"))
+		}
+
+		w.WriteHeader(200)
+		w.Write(contents)
+		f.Close()
 	}
 }

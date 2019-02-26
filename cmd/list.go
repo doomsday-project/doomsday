@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/olekukonko/tablewriter"
@@ -54,7 +55,11 @@ func (s *listCmd) Run() error {
 
 func printList(items doomsday.CacheItems) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Common Name", "Expires In", "Backend", "Path"})
+	table.SetBorder(false)
+	table.SetRowLine(true)
+	table.SetAutoWrapText(false)
+	table.SetReflowDuringAutoWrap(false)
+	table.SetHeader([]string{"Common Name", "Expiry", "Path"})
 	for _, result := range items {
 		expiresIn := time.Until(time.Unix(result.NotAfter, 0))
 
@@ -65,11 +70,26 @@ func printList(items doomsday.CacheItems) {
 		table.Append([]string{
 			result.CommonName,
 			expStr,
-			result.BackendName,
-			result.Path,
+			genPathStr(result),
 		})
 	}
-	table.SetBorder(false)
-	table.SetRowLine(true)
 	table.Render()
+}
+
+func genPathStr(item doomsday.CacheItem) string {
+	fmtPaths := []string{}
+	for i := 0; i < len(item.Paths); i++ {
+		backendStr := item.Paths[i].Backend + "->"
+		if i != 0 && item.Paths[i].Backend == item.Paths[i-1].Backend {
+			b := make([]byte, len(backendStr))
+			for j := range b {
+				b[j] = 0x20
+			}
+			backendStr = string(b)
+		}
+		fmtPaths = append(fmtPaths, fmt.Sprintf("%s%s", backendStr, item.Paths[i].Location))
+	}
+
+	ret := strings.Join(fmtPaths, "\n")
+	return ret
 }

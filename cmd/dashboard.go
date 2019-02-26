@@ -35,12 +35,16 @@ func (d *dashboardCmd) Run() error {
 		header.Render()
 
 		t := tablewriter.NewWriter(os.Stdout)
-		t.SetHeader([]string{"Common Name", "Backend", "Path"})
-		for _, v := range expired {
-			t.Append([]string{v.CommonName, v.BackendName, v.Path})
-		}
 		t.SetBorder(false)
 		t.SetRowLine(true)
+		t.SetAutoWrapText(false)
+		t.SetReflowDuringAutoWrap(false)
+
+		t.SetHeader([]string{"Common Name", "Path"})
+
+		for _, v := range expired {
+			t.Append([]string{v.CommonName, genPathStr(v)})
+		}
 		t.Render()
 	}
 
