@@ -1,26 +1,59 @@
 <html>
 <head>
 	<title>Doomsday</title>
-  <link rel='stylesheet' type='text/css' href='web/assets/stylesheet.css'></link>
+  <link rel='stylesheet' type='text/css' href='web/assets/stylesheet.css'>
+  <link href="https://fonts.googleapis.com/css?family=Walter+Turncoat" rel="stylesheet"> 
 </head>
 <body>
 	<div id="certs"></div>
 	<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
 	<script src="web/assets/lens.js"></script>
-	<script type="text/html" id="template:cert_list">
-		<table>
-		<tr>
-			<th>Common Name</th>
-			<th>Not After</th>
-		</tr>
-		[[ _.certs.forEach(function(v) { ]]
-			<tr>
-				<td>[[= v.common_name ]]</td>
-				<td>[[= v.not_after ]]</td>
-			</tr>
-		[[ }); ]]
-		</table>
+
+	<script type="text/html" id="template:cert-card-header">
+		[[
+			if (_.value == "") {
+				_.value = "<em>(not provided)</em>"
+			}
+		]]
+		<div class="certs-content-header">[[= _.value ]]</div>
 	</script>
+
+	<script type="text/hmtl" id="template:cert-card-line">
+		[[ 
+		  if (!Array.isArray(_.value)) {
+				_.value = [ _.value ];
+		  }
+		]]
+		<div class="certs-content-label">[[= _.label ]]</div>
+		[[ _.value.forEach(function(v) { ]]
+			<div class="certs-content-value">[[= v ]]</div>
+		[[ }); ]]
+	</script>
+
+	<script type="text/html" id="template:cert-card">
+		<div class="cert-grid-container">
+			<div class="cert-card">
+				[[
+					lens.include("cert-card-header", { label: "COMMON NAME", value: lens.maybe(_.cert.common_name) });
+				]]
+					<div class="certs-content-body">
+				[[
+						lens.include("cert-card-line", { label: "NOT AFTER", value: _.cert.not_after });
+						lens.include("cert-card-line", { label: "PATHS", value: _.cert.paths.map(function(path) { return path.backend + ":" + path.location })});
+				]]
+					</div>
+			</div>
+		</div>
+	</script>
+
+	<script type="text/html" id="template:cert-list">
+		[[ 
+			_.certs.forEach(function(v) {
+				lens.include("cert-card", { cert: v });
+			}); 
+		]]
+	</script>
+
 	<script>
 		$(document).ready(function(){
 			$.ajax({
@@ -28,7 +61,7 @@
 				url: "/v1/cache",
 				dataType: "json",
 				success: function(data) {
-					$("#certs").template("cert_list", { certs: data.content })
+					$("#certs").template("cert-list", { certs: data.content })
 					$("#certs").show()
 				}
 			})

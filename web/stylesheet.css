@@ -1,3 +1,69 @@
 #certs {
-	display: none;
+	margin-top: 40px;
+	border-top-style: solid;
+	border-top-width: thin;
+	display: flex;
+	flex-wrap: wrap;
 }
+
+body {
+	background-color: #444444;
+}
+
+div {
+	font-family: "Walter Turncoat", "Verdana";
+	color: rgba(0,0,0,.8);
+}
+
+.certs-content-header {
+	background-color: rgba(0,0,0,.0700);
+	border-radius: 8px 8px 0px 0px;
+	border-bottom-style: solid;
+	border-bottom-color: rgba(0,0,0,0.0500);
+	border-width: thin;
+	text-align: center;
+	font-size: 24;
+	padding: 0.3em 0em;
+	font-weight: bold;
+	color: #FFFFFF;
+}
+
+.certs-content-body {
+	padding: 0.5em 1em;
+}
+
+.cert-card {
+	border-style: solid;
+	border-width: thin;
+	border-color: rgba(0, 0, 0, 0.0300);
+  background-color: #dc3545;
+	margin: 1em 2em;
+	border-radius: 8px;
+	box-shadow: 7px 5px rgba(0,0,0,0.450);
+}
+
+.certs-content-label {
+	font-weight: bold;
+	font-size: 11;
+	color: #ffffff;
+	margin-top: 1em;
+}
+
+.certs-content-value {
+	padding-left: 8px;
+	margin-bottom: 0.1em;
+	font-size: 18;
+}
+
+@media only screen and (min-width: 1250px) {
+	.cert-grid-container {
+	  width: 50%;
+  }
+}
+
+@media only screen and (min-width: 2000px) {
+  .cert-grid-container {
+	  width: 33.33333%;
+  }
+}
+
