@@ -107,8 +107,8 @@ type CacheItem struct {
 }
 
 type CacheItemPath struct {
-	Backend  string `json: "backend"`
-	Location string `json: "location"`
+	Backend  string `json:"backend"`
+	Location string `json:"location"`
 }
 
 type CacheItems []CacheItem
