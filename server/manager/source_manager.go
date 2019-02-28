@@ -32,21 +32,9 @@ func (s *Source) Refresh(global *doomsday.Cache, mode string, log *logger.Logger
 		log.WriteF("Error populating info from backend `%s': %s", s.Core.Name, err)
 		return
 	}
-	log.WriteF("Printing %s map", s.Core.Name)
-	log.WriteF("")
-	for k, v := range s.Core.Cache().Map() {
-		log.WriteF("%x -> %+v", k, v)
-	}
-
 	global.ApplyDiff(old, s.Core.Cache())
 	log.WriteF("Finished %s populate of `%s' after %s. %d/%d paths searched. %d certs found",
 		mode, s.Core.Name, time.Since(startedAt), results.NumSuccess, results.NumPaths, results.NumCerts)
-
-	log.WriteF("Printing global map")
-	log.WriteF("")
-	for k, v := range global.Map() {
-		log.WriteF("%x -> %+v", k, v)
-	}
 }
 
 type SourceManager struct {
