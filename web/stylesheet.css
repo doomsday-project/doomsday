@@ -1,9 +1,6 @@
 #certs {
-	margin-top: 40px;
-	border-top-style: solid;
-	border-top-width: thin;
-	display: flex;
-	flex-wrap: wrap;
+	margin-top: 20px;
+	width: 100%;
 }
 
 body {
@@ -13,6 +10,10 @@ body {
 div {
 	font-family: "Walter Turncoat", "Verdana";
 	color: rgba(0,0,0,.8);
+}
+
+.cert-grid-container {
+	width: 100%;
 }
 
 .certs-content-header {
@@ -32,11 +33,60 @@ div {
 	padding: 0.5em 1em;
 }
 
+.cert-list-header-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.cert-list-header {
+	display: inline-block;
+	border-style: solid;
+	border-width: 1px;
+	border-color: rgba(255,255,255,0.1) rgba(0,0,0,0.1) rgba(0,0,0,0.1) rgba(255,255,255,0.1);
+	margin: auto;
+	box-shadow: 7px 5px rgba(0, 0, 0, 0.450);
+	border-radius: 8px;
+	padding: 0.25em 1em;
+	font-size: 40;
+	color: white;
+	font-weight: bold;
+}
+
+.cert-list-header-line {
+	height: 50px;
+	width: 4px;
+	background-color: white;
+	margin: auto;
+}
+
+.cert-list-header-line-taper-in {
+	height: 40px;
+	width: 4px;
+	background-image: linear-gradient(to top, rgba(255,255,255,1), rgba(0,0,0,0));
+	margin: auto;
+}
+
+.cert-list-header-line-taper-out {
+	height: 40px;
+	width: 4px;
+	background-image: linear-gradient(to bottom, rgba(255,255,255,1), rgba(0,0,0,0));
+	margin: auto;
+}
+
+.cert-list-body {
+  display: flex;
+	flex-wrap: wrap;
+}
+
+.cert-list {
+	width: 100%;
+}
+
 .cert-card {
 	border-style: solid;
 	border-width: thin;
-	border-color: rgba(0, 0, 0, 0.0300);
-  background-color: #dc3545;
+	border-color: rgba(255,255,255, 0.1) rgba(0, 0, 0, 0.0300) rgba(0, 0, 0, 0.300) rgba(255, 255, 255, 0.1);
 	margin: 1em 2em;
 	border-radius: 8px;
 	box-shadow: 7px 5px rgba(0,0,0,0.450);
@@ -53,9 +103,17 @@ div {
 	padding-left: 8px;
 	margin-bottom: 0.1em;
 	font-size: 18;
+	word-wrap: break-word;
 }
 
-@media only screen and (min-width: 1250px) {
+.horizontal-line {
+	display: block;
+	height: 2px;
+	background-color: rgba(0,0,0,0.100);
+	margin: 0 1em;
+}
+
+@media only screen and (min-width: 1100px) {
 	.cert-grid-container {
 	  width: 50%;
   }

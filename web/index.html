@@ -25,20 +25,33 @@
 		  }
 		]]
 		<div class="certs-content-label">[[= _.label ]]</div>
-		[[ _.value.forEach(function(v) { ]]
-			<div class="certs-content-value">[[= v ]]</div>
-		[[ }); ]]
+		<div class="certs-content-value">[[= _.value[0] ]]</div>
+		[[ 
+		if (_.value.length > 1) {
+		  _.value.slice(1).forEach(function(v) {
+		]]
+		    <div class="horizontal-line"></div>
+			  <div class="certs-content-value">[[= v ]]</div>
+		[[
+		  });
+		}
+		]]
 	</script>
 
 	<script type="text/html" id="template:cert-card">
 		<div class="cert-grid-container">
-			<div class="cert-card">
+			<div class="cert-card" style="background-color: [[= _.color ]];">
 				[[
 					lens.include("cert-card-header", { label: "COMMON NAME", value: lens.maybe(_.cert.common_name) });
 				]]
 					<div class="certs-content-body">
 				[[
-						lens.include("cert-card-line", { label: "NOT AFTER", value: _.cert.not_after });
+				    timefmt = Lens.strftime("%a, %b %d %Y at %I:%M %P", _.cert.not_after );
+						console.log("Current: " + new Date().getTime()/1000 + ", Not After: " + _.cert.not_after);
+						if (new Date().getTime()/1000 > _.cert.not_after) {
+							timefmt = "<s>"+timefmt+"</s> EXPIRED";
+						}
+						lens.include("cert-card-line", { label: "NOT AFTER", value: timefmt });
 						lens.include("cert-card-line", { label: "PATHS", value: _.cert.paths.map(function(path) { return path.backend + ":" + path.location })});
 				]]
 					</div>
@@ -47,24 +60,109 @@
 	</script>
 
 	<script type="text/html" id="template:cert-list">
-		[[ 
-			_.certs.forEach(function(v) {
-				lens.include("cert-card", { cert: v });
-			}); 
+		  <div class="cert-list">
+				[[ if (!_.skip_upper_line) { ]]
+					<div class="cert-list-header-line-taper-in"></div>
+					<div class="cert-list-header-line"></div>
+				[[ } ]]
+				<div class="cert-list-header-container">
+					<div class="cert-list-header" style="background-color: [[= _.color ]];">
+						[[= _.header ]]
+					</div>
+				</div>
+				<div class="cert-list-header-line"></div>
+				<div class="cert-list-header-line-taper-out"></div>
+				<div class="cert-list-body">
+				[[
+					_.certs.forEach(function(v) {
+						lens.include("cert-card", { cert: v, color: _.color });
+					}); 
+				]]
+				</div>
+			</div>
+	</script>
+
+	<script type="text/html" id="template:cert-list-group">
+		[[
+			_.lists.forEach(function(v, i) {
+			  if (i == 0) {
+					v.skip_upper_line = true;
+				}
+
+				lens.include("cert-list", v);
+			});
 		]]
 	</script>
 
 	<script>
-		$(document).ready(function(){
+		function updateCertList() {
 			$.ajax({
 				method: "GET",
 				url: "/v1/cache",
 				dataType: "json",
 				success: function(data) {
-					$("#certs").template("cert-list", { certs: data.content })
+					now = new Date().getTime()/1000;
+					var i = 0;
+					for (; i < data.content.length; i++) {
+						if (now <= data.content[i].not_after) {
+							break;
+						}
+					}
+					var expired_certs = data.content.slice(0, i);
+
+					var start_seven_days = i;
+					seven_days = now + (60 * 60 * 24 * 7);
+					for (; i < data.content.length; i++) {
+						if (seven_days <= data.content[i].not_after) {
+							break;
+						}
+					}
+					var under_seven_days_certs = data.content.slice(start_seven_days, i);
+
+					var start_thirty_days = i;
+					thirty_days = now + (60 * 60 * 24 * 30);
+					for (; i < data.content.length; i++) {
+						if (thirty_days <= data.content[i].not_after) {
+							break;
+						}
+					}
+					var under_thirty_days_certs = data.content.slice(start_thirty_days, i);
+
+					var start_sixty_days = i;
+					sixty_days = now + (60 * 60 * 24 * 60);
+					for (; i < data.content.length; i++) {
+						if (sixty_days <= data.content[i].not_after) {
+							break;
+						}
+					}
+					var under_sixty_days_certs = data.content.slice(start_sixty_days, i);
+
+					var start_ninety_days = i;
+					ninety_days = now + (60 * 60 * 24 * 90);
+					for (; i < data.content.length; i++) {
+						if (ninety_days <= data.content[i].not_after) {
+							break;
+						}
+					}
+					var under_ninety_days_certs = data.content.slice(start_ninety_days, i);
+
+					var the_whole_dang_rest = data.content.slice(i);
+
+					$("#certs").template("cert-list-group", {lists: [
+						{ header: "EXPIRED", certs: expired_certs, color: "#dc3545"},
+						{ header: "LESS THAN SEVEN DAYS", certs: under_seven_days_certs, color: "#fd7e14"},
+						{ header: "LESS THAN THIRTY DAYS", certs: under_thirty_days_certs, color: "#ffc107"},
+						{ header: "LESS THAN SIXTY DAYS", certs: under_sixty_days_certs, color: "#007bff"},
+						{ header: "LESS THAN NINETY DAYS", certs: under_ninety_days_certs, color: "#6f42c1"},
+						{ header: "NOT EXPIRING SOON", certs: the_whole_dang_rest, color: "#28a745"}
+					]})
 					$("#certs").show()
 				}
 			})
+		}
+		$(document).ready(function(){
+			updateCertList();
+			setInterval(updateCertList, 60 * 1000);
 		});
 	</script>
 </body>
