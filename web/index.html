@@ -40,15 +40,17 @@
 
 	<script type="text/html" id="template:cert-card">
 		<div class="cert-grid-container">
-			<div class="cert-card" style="background-color: [[= _.color ]];">
-				[[
-					lens.include("cert-card-header", { label: "COMMON NAME", value: lens.maybe(_.cert.common_name) });
-				]]
-					<div class="certs-content-body">
+			[[
+				expired = new Date().getTime()/1000 > _.cert.not_after;
+				var expiredClass="";
+				if (expired) { expiredClass = " expired-card"; }
+			]]
+			<div class="cert-card[[= expiredClass ]]" [[= (expired ? "" : 'style="background-color: rgb(' + _.color[0] + ',' + _.color[1] + ',' + _.color[2] + ');"') ]] >
+			  [[ lens.include("cert-card-header", { label: "COMMON NAME", value: lens.maybe(_.cert.common_name) }); ]]
+				<div class="certs-content-body">
 				[[
 				    timefmt = Lens.strftime("%a, %b %d %Y at %I:%M %P", _.cert.not_after );
-						console.log("Current: " + new Date().getTime()/1000 + ", Not After: " + _.cert.not_after);
-						if (new Date().getTime()/1000 > _.cert.not_after) {
+						if (expired) {
 							timefmt = "<s>"+timefmt+"</s> EXPIRED";
 						}
 						lens.include("cert-card-line", { label: "NOT AFTER", value: timefmt });
@@ -61,32 +63,49 @@
 
 	<script type="text/html" id="template:cert-list">
 		  <div class="cert-list">
-				[[ if (!_.skip_upper_line) { ]]
-					<div class="cert-list-header-line-taper-in"></div>
-					<div class="cert-list-header-line"></div>
-				[[ } ]]
-				<div class="cert-list-header-container">
-					<div class="cert-list-header" style="background-color: [[= _.color ]];">
-						[[= _.header ]]
-					</div>
-				</div>
-				<div class="cert-list-header-line"></div>
-				<div class="cert-list-header-line-taper-out"></div>
 				<div class="cert-list-body">
 				[[
+					if (_.cutoff != _.previous_cutoff) {
+						color_divisor = _.cutoff - _.previous_cutoff;
+						red_range = _.color[0] - _.previous_color[0];
+						green_range = _.color[1] - _.previous_color[1];
+						blue_range = _.color[2] - _.previous_color[2];
+					} 
+
 					_.certs.forEach(function(v) {
-						lens.include("cert-card", { cert: v, color: _.color });
+						var color = _.color;
+						if (_.cutoff != _.previous_cutoff) {
+							var color_dividend = v.not_after - _.previous_cutoff;
+							var color_percent = color_dividend / color_divisor;
+							var red = _.previous_color[0] + (red_range * color_percent);
+							var green = _.previous_color[1] + (green_range * color_percent);
+							var blue = _.previous_color[2] + (blue_range * color_percent);
+							color = [red, green, blue];
+						}
+
+						lens.include("cert-card", { cert: v, color: color });
 					}); 
 				]]
 				</div>
+				<div class="cert-list-header-line-taper-in"></div>
+				<div class="cert-list-header-line"></div>
+				<div class="cert-list-header-container">
+					<div class="cert-list-header" style="background-color: rgb([[= _.color[0] + ',' + _.color[1] + ',' + _.color[2] ]]);">
+						[[= _.header ]]
+					</div>
+				</div>
+				[[ if (!_.skip_lower_line) { ]]
+					<div class="cert-list-header-line"></div>
+					<div class="cert-list-header-line-taper-out"></div>
+				[[ } ]]
 			</div>
 	</script>
 
 	<script type="text/html" id="template:cert-list-group">
 		[[
 			_.lists.forEach(function(v, i) {
-			  if (i == 0) {
-					v.skip_upper_line = true;
+			  if (i == _.lists.length - 1) {
+					v.skip_lower_line = true;
 				}
 
 				lens.include("cert-list", v);
@@ -102,61 +121,50 @@
 				dataType: "json",
 				success: function(data) {
 					now = new Date().getTime()/1000;
+					var sections = [
+						{label: "NOW",       cutoff: 0,     color: [229, 53, 69]},
+						{label: "1 WEEK",    cutoff: 7,     color: [253, 126, 20]},
+						{label: "2 WEEKS",   cutoff: 14,    color: [255, 193, 7]},
+						{label: "3 WEEKS",   cutoff: 21,    color: [200, 185, 15]},
+						{label: "1 MONTH",   cutoff: 30,    color: [40, 167, 69]},
+						{label: "2 MONTHS",  cutoff: 60,    color: [40, 167, 69]},
+						{label: "3 MONTHS",  cutoff: 90,    color: [40, 167, 69]},
+						{label: "6 MONTHS",  cutoff: 180,   color: [40, 167, 69]},
+						{label: "1 YEAR",    cutoff: 365,   color: [40, 167, 69]},
+						{label: "2 YEARS",   cutoff: 730,   color: [40, 167, 69]},
+						{label: "5 YEARS",   cutoff: 1461,  color: [40, 167, 69]},
+						{label: "10 YEARS",  cutoff: 2922,  color: [40, 167, 69]},
+						{label: "20 YEARS",  cutoff: 5844,  color: [40, 167, 69]},
+						{label: "50 YEARS",  cutoff: 14610, color: [40, 167, 69]},
+						{label: "100 YEARS", cutoff: 29220, color: [40, 167, 69]}
+					]
+
+					var lists = []
+					
 					var i = 0;
-					for (; i < data.content.length; i++) {
-						if (now <= data.content[i].not_after) {
-							break;
+					sections.forEach(function(section, j) {
+						startIdx = i;
+						cutoffTime = now + (60 * 60 * 24 * section.cutoff);
+						for (; i < data.content.length; i++) {
+							if (cutoffTime <= data.content[i].not_after) {
+								break;
+							}
 						}
-					}
-					var expired_certs = data.content.slice(0, i);
 
-					var start_seven_days = i;
-					seven_days = now + (60 * 60 * 24 * 7);
-					for (; i < data.content.length; i++) {
-						if (seven_days <= data.content[i].not_after) {
-							break;
-						}
-					}
-					var under_seven_days_certs = data.content.slice(start_seven_days, i);
+						lists.push({
+							header: section.label, 
+							previous_cutoff: (j > 0 ? now + sections[j-1].cutoff * 60 * 60 * 24 : 0),
+							cutoff: cutoffTime,
+							previous_color: (j > 0 ? sections[j-1].color : section.color),
+							color: section.color, 
+							certs: data.content.slice(startIdx, i)
+						});
+					});
 
-					var start_thirty_days = i;
-					thirty_days = now + (60 * 60 * 24 * 30);
-					for (; i < data.content.length; i++) {
-						if (thirty_days <= data.content[i].not_after) {
-							break;
-						}
-					}
-					var under_thirty_days_certs = data.content.slice(start_thirty_days, i);
+					lists.push({header: "A LONG TIME FROM NOW...", cutoff: 0, previous_cutoff: 0, color: "#28a745", certs: data.content.slice(i)});
 
-					var start_sixty_days = i;
-					sixty_days = now + (60 * 60 * 24 * 60);
-					for (; i < data.content.length; i++) {
-						if (sixty_days <= data.content[i].not_after) {
-							break;
-						}
-					}
-					var under_sixty_days_certs = data.content.slice(start_sixty_days, i);
-
-					var start_ninety_days = i;
-					ninety_days = now + (60 * 60 * 24 * 90);
-					for (; i < data.content.length; i++) {
-						if (ninety_days <= data.content[i].not_after) {
-							break;
-						}
-					}
-					var under_ninety_days_certs = data.content.slice(start_ninety_days, i);
-
-					var the_whole_dang_rest = data.content.slice(i);
-
-					$("#certs").template("cert-list-group", {lists: [
-						{ header: "EXPIRED", certs: expired_certs, color: "#dc3545"},
-						{ header: "LESS THAN SEVEN DAYS", certs: under_seven_days_certs, color: "#fd7e14"},
-						{ header: "LESS THAN THIRTY DAYS", certs: under_thirty_days_certs, color: "#ffc107"},
-						{ header: "LESS THAN SIXTY DAYS", certs: under_sixty_days_certs, color: "#007bff"},
-						{ header: "LESS THAN NINETY DAYS", certs: under_ninety_days_certs, color: "#6f42c1"},
-						{ header: "NOT EXPIRING SOON", certs: the_whole_dang_rest, color: "#28a745"}
-					]})
-					$("#certs").show()
+					$("#certs").template("cert-list-group", {lists: lists});
+					$("#certs").show();
 				}
 			})
 		}
