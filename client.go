@@ -104,6 +104,7 @@ type CacheItem struct {
 	Paths      []CacheItemPath `json:"paths"`
 	CommonName string          `json:"common_name"`
 	NotAfter   int64           `json:"not_after"`
+	NotBefore  int64           `json:"not_before"`
 }
 
 type CacheItemPath struct {

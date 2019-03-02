@@ -125,6 +125,7 @@ func (s *SourceManager) Data() doomsday.CacheItems {
 			Paths:      paths,
 			CommonName: v.Subject.CommonName,
 			NotAfter:   v.NotAfter.Unix(),
+			NotBefore:  v.NotBefore.Unix(),
 		})
 	}
 

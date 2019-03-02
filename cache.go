@@ -199,9 +199,10 @@ func (c *Cache) Map() map[string]CacheObject {
 }
 
 type CacheObject struct {
-	Subject  pkix.Name
-	NotAfter time.Time
-	Paths    []PathObject
+	Subject   pkix.Name
+	NotAfter  time.Time
+	NotBefore time.Time
+	Paths     []PathObject
 }
 
 type PathObject struct {

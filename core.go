@@ -89,8 +89,9 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateSta
 					cache.Merge(
 						fmt.Sprintf("%s", sha1.Sum(cert.Raw)),
 						CacheObject{
-							Subject:  cert.Subject,
-							NotAfter: cert.NotAfter,
+							Subject:   cert.Subject,
+							NotAfter:  cert.NotAfter,
+							NotBefore: cert.NotBefore,
 							Paths: []PathObject{
 								{
 									Location: path + ":" + k,
