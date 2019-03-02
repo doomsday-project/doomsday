@@ -122,9 +122,13 @@ func (s *SourceManager) Data() doomsday.CacheItems {
 			})
 		}
 		items = append(items, doomsday.CacheItem{
-			Paths:      paths,
-			CommonName: v.Subject.CommonName,
-			NotAfter:   v.NotAfter.Unix(),
+			Paths:                 paths,
+			CommonName:            v.Subject.CommonName,
+			BasicConstraintsValid: v.BasicConstraintsValid,
+			DNSNames:              v.DNSNames,
+			IPAddresses:           v.IPAddresses,
+			NotAfter:              v.NotAfter.Unix(),
+			NotBefore:             v.NotBefore.Unix(),
 		})
 	}
 
