@@ -45,6 +45,9 @@ func (c *Client) do(values url.Values) (*AuthResponse, error) {
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := c.client().Do(req)
+	if err != nil {
+		return nil, err
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Could not authenticate: Status %d", resp.StatusCode)
