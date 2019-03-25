@@ -57,6 +57,9 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateSta
 	}
 
 	var numWorkers = runtime.NumCPU() - 1
+	if numWorkers < 1 {
+		numWorkers = 1
+	}
 	if len(paths) < numWorkers {
 		numWorkers = len(paths)
 	}
