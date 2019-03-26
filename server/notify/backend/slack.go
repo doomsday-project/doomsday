@@ -30,7 +30,7 @@ func newSlackBackend(c SlackConfig, uni BackendUniversalConfig) (*Slack, error) 
 	}
 	return &Slack{
 		webhook: c.Webhook,
-		topic:   fmt.Sprintf("%s<%s>%s", slackQuoteMeta("doomsday: ("), uni.Logger, "): "),
+		topic:   fmt.Sprintf("%s<%s>%s", slackQuoteMeta("doomsday: ("), uni.DoomsdayURL, "): "),
 	}, nil
 }
 
