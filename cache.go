@@ -148,7 +148,9 @@ ForLoop:
 
 	if len(workingCopy) == 0 {
 		delete(c.store, key)
+		return
 	}
+
 	obj.Paths = workingCopy
 	c.store[key] = obj
 }

@@ -1,9 +1,44 @@
+#navbar {
+	background-color: #252525;
+	font-size: 40;
+	height: 1.5em;
+	border-bottom: solid;
+	border-width: thin;
+	border-color: rgba(0,0,0,0.4);
+}
+
+#navbar #logo {
+	display: inline-block;
+  color: white;
+	font-size: 40;
+	padding: 0 0.1em 0 0.5em;
+	position: relative;
+	bottom: 18px;
+}
+
+#navbar .separator {
+	background-color: rgba(255,255,255,0.2);
+	width: 1px;
+	height: 100%;
+	display: inline-block;
+}
+
+#navbar #subtitle {
+	color: white;
+	display: inline-block;
+	font-size: 20;
+	padding: 0 0 0.1em 0.2em;
+	position: relative;
+	bottom: 23px;
+}
+
 #certs {
 	margin-top: 20px;
 	width: 100%;
 }
 
 body {
+	margin: 0px;
 	background-color: #444444;
 }
 
@@ -33,41 +68,35 @@ div {
 	padding: 0.5em 1em;
 }
 
-.cert-list-header-container {
+.cert-list-footer-container {
+  margin: 0 8px 0 0;
 	display: flex;
-	justify-content: center;
-	align-items: center;
 }
 
-.cert-list-header {
-	display: inline-block;
-	border-style: solid;
-	border-width: 1px;
-	border-color: rgba(255,255,255,0.1) rgba(0,0,0,0.1) rgba(0,0,0,0.1) rgba(255,255,255,0.1);
+.cert-list-footer-left-buffer {
+	width: 90%;
+	align-content: center;
+	display: flex;
+}
+
+.cert-list-footer-timeline-container {
+	width: 5%;
 	margin: auto;
-	box-shadow: 7px 5px rgba(0, 0, 0, 0.450);
-	border-radius: 8px;
-	padding: 0.25em 1em;
-	font-size: 40;
+}
+
+.cert-list-footer-timeline-label {
 	color: white;
-	font-weight: bold;
+	text-align: center;
 }
 
-.cert-list-header-line {
-	height: 50px;
-	width: 4px;
-	background-color: white;
-	margin: auto;
-}
-
-.cert-list-header-line-taper-in {
+.cert-list-body-line-taper-in {
 	height: 40px;
 	width: 4px;
 	background-image: linear-gradient(to top, rgba(255,255,255,1), rgba(0,0,0,0));
 	margin: auto;
 }
 
-.cert-list-header-line-taper-out {
+.cert-list-body-line-taper-out {
 	height: 40px;
 	width: 4px;
 	background-image: linear-gradient(to bottom, rgba(255,255,255,1), rgba(0,0,0,0));
@@ -75,6 +104,27 @@ div {
 }
 
 .cert-list-body {
+	display: flex;
+}
+
+.cert-list-body-card-container {
+	width: 90%;
+}
+
+.cert-list-body-timeline-container {
+	margin: 0 8px 0 0;
+	width: 10%;
+}
+
+.cert-list-body-timeline-line {
+	width: 4px;
+	height: calc(100% - 80px);
+	background-color: white;
+	margin: auto;
+}
+
+
+.cert-list-body-card-container {
   display: flex;
 	flex-wrap: wrap;
 }
@@ -109,19 +159,64 @@ div {
 .horizontal-line {
 	display: block;
 	height: 2px;
+  width: 95%;
+	margin: auto;
 	background-color: rgba(0,0,0,0.100);
-	margin: 0 1em;
+}
+
+.expired-card {
+	background-color: #252525;
+	box-shadow: 7px 5px rgb(229, 53, 69);
+	border-color: rgba(255, 255, 255, 0.25) rgba(0, 0, 0, 0.7) rgba(0, 0, 0, 0.7) rgba(255, 255, 255, 0.25) !important;
+}
+
+.expired-card .certs-content-header {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.expired-card .certs-content-value {
+	color: rgb(229, 53, 69);
 }
 
 @media only screen and (min-width: 1100px) {
 	.cert-grid-container {
 	  width: 50%;
   }
+	
+  .cert-list-body-card-container {
+	  width: 95%;
+  }
+
+  .cert-list-body-timeline-container {
+	  margin: 0 8px 0 0;
+	  width: 5%;
+  }
+	
+  .cert-list-footer-left-buffer {
+	  width: 95%;
+	  align-content: center;
+	  display: flex;
+  }
 }
 
 @media only screen and (min-width: 2000px) {
   .cert-grid-container {
 	  width: 33.33333%;
+  }
+	
+	.cert-list-body-card-container {
+	  width: 95%;
+  }
+
+  .cert-list-body-timeline-container {
+	  margin: 0 8px 0 0;
+	  width: 5%;
+  }
+	
+	.cert-list-footer-left-buffer {
+	  width: 95%;
+	  align-content: center;
+	  display: flex;
   }
 }
 
