@@ -1,6 +1,6 @@
 #This is a doomsday server configuration manifest
 
-# backends: (hash) The list of backends to ingest certificates from. Each entry
+# backends: (list) The list of backends to ingest certificates from. Each entry
 # in the backends list is a hash that looks like
 #  - type: <backend-type>
 #    name: <backend-name>
