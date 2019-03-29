@@ -17,7 +17,7 @@
 }
 
 #navbar .separator {
-	background-color: rgba(255,255,255,0.2);
+	background-color: rgba(255,255,255,0.0);
 	width: 1px;
 	height: 100%;
 	display: inline-block;
@@ -25,7 +25,7 @@
 
 #navbar #subtitle {
 	color: white;
-	display: inline-block;
+  display: none;
 	font-size: 20;
 	padding: 0 0 0.1em 0.2em;
 	position: relative;
@@ -87,15 +87,30 @@ div {
 }
 
 
+.cert-list-body-timeline-container {
+	position: relative;
+	margin-right: 10px;
+}
+
 .cert-list-body-line-taper-in {
 	height: 40px;
 	width: 4px;
+	position: relative;
 	background-image: linear-gradient(to top, rgba(255,255,255,1), rgba(0,0,0,0));
+}
+
+.cert-list-body-timeline-line {
+	width: 4px;
+	position: absolute;
+	height: calc(100% - 80px);
+	background-color: white;
 }
 
 .cert-list-body-line-taper-out {
 	height: 40px;
 	width: 4px;
+	position: absolute;
+	top: calc(100% - 40px);
 	background-image: linear-gradient(to bottom, rgba(255,255,255,1), rgba(0,0,0,0));
 }
 
@@ -106,17 +121,6 @@ div {
 .cert-list-body-card-container {
 	flex: 1 1 auto;
 }
-
-.cert-list-body-timeline-container {
-	margin-right: 1%;
-}
-
-.cert-list-body-timeline-line {
-	width: 4px;
-	height: calc(100% - 80px);
-	background-color: white;
-}
-
 
 .cert-list-body-card-container {
   display: flex;
@@ -182,6 +186,17 @@ div {
 	.cert-grid-container {
 	  width: 50%;
   }
+	
+	#navbar .separator {
+	  background-color: rgba(255,255,255,0.2);
+	  width: 1px;
+	  height: 100%;
+	  display: inline-block;
+  }
+	
+	#navbar #subtitle {
+		 display: inline-block;
+	}
 }
 
 @media only screen and (min-width: 2000px) {
@@ -189,4 +204,3 @@ div {
 	  width: 33.33333%;
   }
 }
-
