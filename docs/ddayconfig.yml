@@ -149,19 +149,19 @@ notifications:
     type: shout
     # (hash) backend-type specific notification options
     properties:
-      # (string) The url of the shout server
+    #   (string) The url of the shout server
       url: "http://localhost:7109"
-      # (string) The username to authenticate to the shout server with
+    #   (string) The username to authenticate to the shout server with
       username: admin
-      # (string) The password to authenticate to the shout server with
+    #   (string) The password to authenticate to the shout server with
       password: password
-      # (string) The topic to notify for (this is an identifier for this doomsday server in shout)
+    # (string) The topic to notify for (this is an identifier for this doomsday server in shout)
       topic: doomsday
     ## Notifications through incoming webhooks to Slack.
     #type: slack
     #properties:
     #  # (string) The incoming webhook to send the notifications to
-    #  webhook: https://hooks.slack.com/services/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
+    #  webhook: https://hooks.slack.com/services/ABCDEFGHI/JKLMNOPQR/StUvWxYz12345678910aBcDeFg
     #  # (bool) Whether to send notifications when there are no certs expiring soon
     #  notify_ok: false
 
@@ -174,7 +174,7 @@ notifications:
     type: constant
     # (hash) schedule-type-specific properties
     properties:
-      # (number) The number of minutes to wait between notifications
+    #  # (number) The number of minutes to wait between notifications
       interval: 30
     #type: cron
     #properties:
