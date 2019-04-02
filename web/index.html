@@ -1,5 +1,6 @@
 <html>
 <head>
+	<meta charset="UTF-8"> 
 	<title>Doomsday</title>
   <link rel='stylesheet' type='text/css' href='web/assets/stylesheet.css'>
   <link href="https://fonts.googleapis.com/css?family=Walter+Turncoat" rel="stylesheet"> 
@@ -23,7 +24,59 @@
 		<div class="certs-content-header">[[= _.value ]]</div>
 	</script>
 
-	<script type="text/hmtl" id="template:cert-card-line">
+	<script type="text/html" id="template:cert-card-path-list">
+		<div class="certs-content-label">PATHS</div>
+		[[
+			var backends = [];
+			_.paths.forEach(function(path) {
+			  console.log(path);
+			  var backendFound = false;
+			  var i = 0;
+				for (; i < backends.length; i++) {
+					if (path.backend == backends[i].name) {
+				    console.log("FOUND BACKEND: " + backends[i].name);
+						backendFound = true; 
+					  backends[i].paths.push(path.location);
+						break;
+					}
+				}
+
+				console.log("backendFound: " + backendFound);
+
+				if (!backendFound) {
+					console.log("NO BACKEND FOUND");
+					backends.push({name: path.backend, paths: [path.location]});
+				} 
+			});
+
+			console.log("BACKENDS: " + backends);
+
+			backends.sort( (x, y) => (x.name < y.name ? -1 : 1) );
+			backends.forEach(function(b, i) { 
+		]]
+		<div class="certs-content-path-backend-container">
+			<div class="certs-content-label certs-content-backend-label">[[= b.name]]</div>
+			<div class="certs-content-path-backend-paths-container">
+		[[
+				backends[i].paths.sort(); 
+		]]
+		    <div class="certs-content-value">[[= backends[i].paths[0] ]]</div>
+		[[
+				backends[i].paths.slice(1).forEach(function(path) {
+		]]
+					<div class="horizontal-line"></div>
+					<div class="certs-content-value">[[= path ]]</div>
+		[[
+				});
+		]]
+		  </div>
+		</div>
+		[[
+			});
+		]]
+	</script>
+
+	<script type="text/html" id="template:cert-card-line">
 		[[ 
 		  if (!Array.isArray(_.value)) {
 				_.value = [ _.value ];
@@ -55,11 +108,13 @@
 				<div class="certs-content-body">
 				[[
 				    timefmt = Lens.strftime("%a, %b %d %Y at %I:%M %P", _.cert.not_after );
+				    var label = "NOT AFTER";
 						if (expired) {
-							timefmt = "<s>"+timefmt+"</s> EXPIRED";
+						  label = "REST IN PEACE";
+							//timefmt = "<s>"+timefmt+"</s> EXPIRED";
 						}
-						lens.include("cert-card-line", { label: "NOT AFTER", value: timefmt });
-						lens.include("cert-card-line", { label: "PATHS", value: _.cert.paths.map(function(path) { return path.backend + ":" + path.location })});
+						lens.include("cert-card-line", { label: label, value: timefmt });
+						lens.include("cert-card-path-list", { paths: _.cert.paths });
 				]]
 					</div>
 			</div>

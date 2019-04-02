@@ -182,6 +182,17 @@ func serveFile(filepath string) func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("Could not read contents of file"))
 		}
 
+		contentType := "text/plain"
+		if strings.HasSuffix(filepath, ".html") {
+			contentType = "text/html"
+		} else if strings.HasSuffix(filepath, ".css") {
+			contentType = "text/css"
+		} else if strings.HasSuffix(filepath, ".js") {
+			contentType = "application/javascript"
+		}
+
+		w.Header().Set("Content-Type", contentType)
+
 		w.WriteHeader(200)
 		w.Write(contents)
 		f.Close()
