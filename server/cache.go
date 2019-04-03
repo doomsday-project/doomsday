@@ -1,4 +1,4 @@
-package doomsday
+package server
 
 import (
 	"crypto/x509/pkix"

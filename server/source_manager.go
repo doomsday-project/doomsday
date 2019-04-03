@@ -1,16 +1,16 @@
-package manager
+package server
 
 import (
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/thomasmmitchell/doomsday"
+	"github.com/thomasmmitchell/doomsday/client/doomsday"
 	"github.com/thomasmmitchell/doomsday/server/logger"
 )
 
 type Source struct {
-	Core     *doomsday.Core
+	Core     *Core
 	Interval time.Duration
 	nextRun  time.Time
 }
@@ -20,12 +20,12 @@ func (s *Source) Bump() {
 	s.nextRun = time.Now().Add(s.Interval)
 }
 
-func (s *Source) Refresh(global *doomsday.Cache, mode string, log *logger.Logger) {
+func (s *Source) Refresh(global *Cache, mode string, log *logger.Logger) {
 	log.WriteF("Running %s populate of `%s'", mode, s.Core.Name)
 	startedAt := time.Now()
 	old := s.Core.Cache()
 	if old == nil {
-		old = doomsday.NewCache()
+		old = NewCache()
 	}
 	results, err := s.Core.Populate()
 	if err != nil {
@@ -46,7 +46,7 @@ type SourceManager struct {
 	queue   []*Source
 	lock    sync.RWMutex
 	log     *logger.Logger
-	global  *doomsday.Cache
+	global  *Cache
 }
 
 func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
@@ -63,7 +63,7 @@ func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
 		sources: sources,
 		queue:   queue,
 		log:     log,
-		global:  doomsday.NewCache(),
+		global:  NewCache(),
 	}
 }
 

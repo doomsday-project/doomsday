@@ -13,11 +13,10 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/thomasmmitchell/doomsday"
+	"github.com/thomasmmitchell/bosh-complete/version"
+	"github.com/thomasmmitchell/doomsday/client/doomsday"
 	"github.com/thomasmmitchell/doomsday/server/auth"
 	"github.com/thomasmmitchell/doomsday/server/logger"
-	"github.com/thomasmmitchell/doomsday/server/manager"
-	"github.com/thomasmmitchell/doomsday/server/notify"
 	"github.com/thomasmmitchell/doomsday/storage"
 )
 
@@ -38,7 +37,7 @@ func Start(conf Config) error {
 	log.WriteF("Initializing server")
 	log.WriteF("Configuring targeted storage backends")
 
-	sources := make([]manager.Source, 0, len(conf.Backends))
+	sources := make([]Source, 0, len(conf.Backends))
 	for _, b := range conf.Backends {
 		backendName := b.Name
 		if backendName == "" {
@@ -51,18 +50,18 @@ func Start(conf Config) error {
 			return fmt.Errorf("Error configuring backend `%s': %s", b.Name, err)
 		}
 
-		thisCore := doomsday.Core{Backend: thisBackend, Name: backendName}
-		thisCore.SetCache(doomsday.NewCache())
+		thisCore := Core{Backend: thisBackend, Name: backendName}
+		thisCore.SetCache(NewCache())
 
 		sources = append(sources,
-			manager.Source{
+			Source{
 				Core:     &thisCore,
 				Interval: time.Duration(b.RefreshInterval) * time.Minute,
 			},
 		)
 	}
 
-	manager := manager.NewSourceManager(sources, log)
+	manager := NewSourceManager(sources, log)
 	manager.BackgroundScheduler()
 
 	log.WriteF("Began asynchronous cache population")
@@ -74,7 +73,7 @@ func Start(conf Config) error {
 	}
 
 	if conf.Notifications.Schedule.Type != "" {
-		err = notify.NotifyFrom(conf.Notifications, manager, log)
+		err = NotifyFrom(conf.Notifications, manager, log)
 		if err != nil {
 			return fmt.Errorf("Error setting up notifications: %s", err)
 		}
@@ -133,7 +132,7 @@ func getInfo(authType auth.AuthType) func(w http.ResponseWriter, r *http.Request
 			Version  string `json:"version"`
 			AuthType string `json:"auth_type"`
 		}{
-			Version:  doomsday.Version,
+			Version:  version.Version,
 			AuthType: string(authType),
 		})
 		if err != nil {
@@ -145,7 +144,7 @@ func getInfo(authType auth.AuthType) func(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func getCache(manager *manager.SourceManager) func(w http.ResponseWriter, r *http.Request) {
+func getCache(manager *SourceManager) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		items := manager.Data()
 		sort.Slice(items, func(i, j int) bool { return items[i].NotAfter < items[j].NotAfter })
@@ -161,7 +160,7 @@ func getCache(manager *manager.SourceManager) func(w http.ResponseWriter, r *htt
 	}
 }
 
-func refreshCache(manager *manager.SourceManager) func(w http.ResponseWriter, r *http.Request) {
+func refreshCache(manager *SourceManager) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		go manager.RefreshAll()
 		w.WriteHeader(204)

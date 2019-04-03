@@ -1,4 +1,4 @@
-package doomsday
+package server
 
 import (
 	"crypto/sha1"

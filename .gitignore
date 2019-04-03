@@ -3,3 +3,4 @@ ddayconfig.yml
 !docs/ddayconfig.yml
 doomsday-darwin
 doomsday-linux
+!client/doomsday

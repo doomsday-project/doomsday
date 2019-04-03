@@ -8,7 +8,7 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/starkandwayne/goutils/ansi"
-	"github.com/thomasmmitchell/doomsday"
+	"github.com/thomasmmitchell/doomsday/client/doomsday"
 	"github.com/thomasmmitchell/doomsday/duration"
 )
 

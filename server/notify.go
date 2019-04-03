@@ -1,28 +1,22 @@
-package notify
+package server
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/thomasmmitchell/doomsday"
+	"github.com/thomasmmitchell/doomsday/client/doomsday"
 	"github.com/thomasmmitchell/doomsday/server/logger"
-	"github.com/thomasmmitchell/doomsday/server/manager"
+	"github.com/thomasmmitchell/doomsday/server/notify"
 	"github.com/thomasmmitchell/doomsday/server/notify/backend"
 	"github.com/thomasmmitchell/doomsday/server/notify/schedule"
 )
-
-type Config struct {
-	Backend     backend.Config  `yaml:"backend"`
-	Schedule    schedule.Config `yaml:"schedule"`
-	DoomsdayURL string          `yaml:"doomsday_url"`
-}
 
 type notifier struct {
 	s schedule.Schedule
 	b backend.Backend
 }
 
-func NotifyFrom(conf Config, m *manager.SourceManager, l *logger.Logger) error {
+func NotifyFrom(conf notify.Config, m *SourceManager, l *logger.Logger) error {
 	var n notifier
 	var err error
 

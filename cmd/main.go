@@ -9,7 +9,8 @@ import (
 	"os"
 
 	"github.com/starkandwayne/goutils/ansi"
-	"github.com/thomasmmitchell/doomsday"
+	"github.com/thomasmmitchell/doomsday/client/doomsday"
+	"github.com/thomasmmitchell/doomsday/version"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -69,7 +70,7 @@ var client *doomsday.Client
 
 func main() {
 	registerCommands(app)
-	app.Version(doomsday.Version)
+	app.Version(version.Version)
 	app.VersionFlag.Short('v')
 	app.HelpFlag.Short('h')
 
