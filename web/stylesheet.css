@@ -1,3 +1,15 @@
+#viewport {
+	display: flex;
+	width: 100%;
+	background: repeating-linear-gradient(
+		45deg,
+		rgba(0, 0, 0, 0),
+		rgba(0, 0, 0, 0) 60px,
+		rgba(0, 0, 0, 0.15) 60px,
+		rgba(0, 0, 0, 0.15) 120px
+  );
+}
+
 #navbar {
 	background-color: #252525;
 	font-size: 40;
@@ -34,7 +46,26 @@
 
 #certs {
 	margin-top: 20px;
-	width: 100%;
+  flex: 1 1 auto;
+}
+
+#no-cert-container {
+	display: flex;
+}
+
+.no-cert-textbox {
+	border-style: solid;
+	border-radius: 8px;
+	border-color: white;
+	border-width: thick;
+	font-weight: bold;
+	background-color: rgba(0, 0, 0, 0.15);
+	color: white;
+	font-size: 4vw;
+	padding: 0.75em;
+	position: relative;
+	top: 30vh;
+	margin: auto;
 }
 
 body {
@@ -187,7 +218,16 @@ div {
 
 .cert-list-footer-left-buffer .horizontal-line {
 	width: 100%;
-	margin-right: 2%;
+	background-color: white;
+	height: 4px;
+}
+
+.horizontal-line-taper {
+	height: 4px;
+	width: 40px;
+	position: relative;
+	margin-right: 1%;
+	background-image: linear-gradient(to right, rgba(255,255,255,1), rgba(0,0,0,0));
 }
 
 .expired-card {
@@ -204,7 +244,7 @@ div {
 	color: rgb(229, 53, 69);
 }
 
-@media only screen and (min-width: 1100px) {
+@media only screen and (min-width: 1200px) {
 	.cert-grid-container {
 	  width: 50%;
   }
@@ -221,7 +261,7 @@ div {
 	}
 }
 
-@media only screen and (min-width: 2000px) {
+@media only screen and (min-width: 1800px) {
   .cert-grid-container {
 	  width: 33.33333%;
   }
