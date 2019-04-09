@@ -188,6 +188,8 @@ func serveFile(filepath string) func(w http.ResponseWriter, r *http.Request) {
 			contentType = "text/css"
 		} else if strings.HasSuffix(filepath, ".js") {
 			contentType = "application/javascript"
+		} else if strings.HasSuffix(filepath, ".svg") {
+			contentType = "image/svg+xml"
 		}
 
 		w.Header().Set("Content-Type", contentType)

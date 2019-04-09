@@ -6,14 +6,27 @@
   <link href="https://fonts.googleapis.com/css?family=Walter+Turncoat" rel="stylesheet"> 
 </head>
 <body>
-	<div id="navbar">
-		<div id="logo">doomsday</div>
-		<div class="separator"></div>
-		<div id="subtitle">an x509 monitoring tool</div>
+	<div id="navbar" class="sticky">
+		<div class="navbar-content navbar-border navbar-button" id="hamburger-box">
+			<svg id="hamburger" preserveAspectRatio="none" aria-hidden="true" focusable="false" data-prefix="fas" data-icon="bars" class="svg-inline--fa fa-bars fa-w-14" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path fill="currentColor" d="M16 132h416c8.837 0 16-7.163 16-16V76c0-8.837-7.163-16-16-16H16C7.163 60 0 67.163 0 76v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16zm0 160h416c8.837 0 16-7.163 16-16v-40c0-8.837-7.163-16-16-16H16c-8.837 0-16 7.163-16 16v40c0 8.837 7.163 16 16 16z"></path></svg>
+		</div>
+		<div class="navbar-content navbar-border" id="logo-box">
+			<div id="logo">doomsday</div>
+		</div>
+		<div class="navbar-content">
+			<div id="subtitle">an x509 monitoring tool</div>
+		</div>
 	</div>
-	<div id="viewport">
-		<div id="certs"></div>
+
+	<div id="viewport-container">
+		<div id="hamburger-menu" class="sticky navbar-border">
+			<div class="hamburger-menu-button navbar-button" id="logout-button">logout</div>
+		</div>
+		<div id="viewport">
+			<div id="certs"></div>
+		</div>
 	</div>
+
 	<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
 	<script src="web/assets/lens.js"></script>
 
@@ -39,27 +52,20 @@
 		[[
 			var backends = [];
 			_.paths.forEach(function(path) {
-			  console.log(path);
 			  var backendFound = false;
 			  var i = 0;
 				for (; i < backends.length; i++) {
 					if (path.backend == backends[i].name) {
-				    console.log("FOUND BACKEND: " + backends[i].name);
 						backendFound = true; 
 					  backends[i].paths.push(path.location);
 						break;
 					}
 				}
 
-				console.log("backendFound: " + backendFound);
-
 				if (!backendFound) {
-					console.log("NO BACKEND FOUND");
 					backends.push({name: path.backend, paths: [path.location]});
 				} 
 			});
-
-			console.log("BACKENDS: " + backends);
 
 			backends.sort( (x, y) => (x.name < y.name ? -1 : 1) );
 			backends.forEach(function(b, i) { 
@@ -264,7 +270,162 @@
 		$(document).ready(function(){
 			updateCertList();
 			setInterval(updateCertList, 60 * 1000);
+			
+			var hamburgerBox = $('#hamburger-box');
+		  NORMAL_HAMBURGER_WIDTH = hamburgerBox.width();
+		  NORMAL_HAMBURGER_HEIGHT = $('#hamburger').height();
+		  HAMBURGER_BOX_PADDING = hamburgerBox.innerWidth() - NORMAL_HAMBURGER_WIDTH;
 		});
+
+    navbarMousedOver = false;
+		currentScrollNavTransparency = 0;
+
+		function setNavbarTransparency(percentage) {
+			//Set the min opacity here as the fallback.
+			var navbarOpacity = 0.5;
+			var subtitleOpacity = 0;
+			var logoBoxBorderOpacity = 0.0;
+			var logoBoxBorderMaxOpacity = 0.3;
+
+			navbarOpacity = 1 - (navbarOpacity * percentage);
+			subtitleOpacity = 1 - (percentage);
+			logoBoxBorderOpacity = logoBoxBorderMaxOpacity - (logoBoxBorderMaxOpacity * (percentage));
+
+			$('#navbar').css("opacity", navbarOpacity);
+			$('#logo-box').css("border-right-color", "rgba(255, 255, 255, "+logoBoxBorderOpacity+")")
+			$('#navbar .separator').css("opacity", subtitleOpacity);
+			$('#navbar #subtitle').css("opacity", subtitleOpacity);
+		}
+
+		$(window).scroll(function() {
+			var maxPixelDistance = 60;
+			currentScrollNavTransparency = Math.min(document.body.scrollTop / maxPixelDistance, 1);
+			if (!navbarMousedOver && !hamburgerMenuOpen) {
+			  currentAnimNavTransparency = currentScrollNavTransparency;
+				setNavbarTransparency(currentScrollNavTransparency);
+			}
+		})
+
+		FRAMERATE = 42;
+    FRAME_INTERVAL = 1000/FRAMERATE;
+		
+		NO_ANIM = -1;
+		navFadeAnimID = NO_ANIM;
+		currentAnimNavTransparency = currentScrollNavTransparency;
+		
+		function navbarFade(start, end) {
+			if (navFadeAnimID != NO_ANIM) {
+				clearInterval(navFadeAnimID);
+			}
+
+			var duration = 0.3; //in seconds
+			var totalDelta = end - start;
+      var lastAnimTime = new Date().getTime();
+			return function() {
+				var now = new Date().getTime();
+				var timeDelta = now - lastAnimTime;
+				var updatePercentage = (duration * 1000) / timeDelta;
+			  var frameDelta = totalDelta / updatePercentage;
+			  lastAnimTime = now;
+
+				currentAnimNavTransparency = currentAnimNavTransparency + frameDelta;
+				if (totalDelta > 0) {
+					var target = Math.min(currentScrollNavTransparency, end);
+					if (currentAnimNavTransparency >= target) {
+						currentAnimNavTransparency = target;
+						clearInterval(navFadeAnimID);
+						navFadeAnimID = NO_ANIM;
+					} 
+				} else {
+					if (currentAnimNavTransparency <= end) {
+						currentAnimNavTransparency = end;
+						clearInterval(navFadeAnimID);
+						navFadeAnimID = NO_ANIM;
+					} 
+				}
+
+				setNavbarTransparency(currentAnimNavTransparency);
+			}
+		}
+
+		$('#navbar').mouseover(function() {
+			navbarMousedOver = true;
+			navFadeAnimID = setInterval(navbarFade(1, 0), FRAME_INTERVAL);
+		})
+
+		$('#navbar').mouseout(function() {
+			navbarMousedOver = false;
+			if (!hamburgerMenuOpen) {
+				navFadeAnimID = setInterval(navbarFade(0, 1), FRAME_INTERVAL);
+			}
+		})
+
+		hamburgerMenuOpen = false;
+
+		currentHamburgerMenuOpenness = 0;
+
+		function setHamburgerMenuOpenness(percentage) {
+			var menu = $('#hamburger-menu');
+			//The +1 is for the 1px wide border
+			var menuWidth = menu.innerWidth() + 1;
+			var desiredShift = menuWidth * percentage;
+
+			menu.css('left', (-menuWidth + desiredShift) + "px");
+
+			var boxWidth = Math.max(desiredShift - (1 + HAMBURGER_BOX_PADDING), NORMAL_HAMBURGER_WIDTH);
+			var boxHeight = NORMAL_HAMBURGER_HEIGHT - (percentage * (NORMAL_HAMBURGER_HEIGHT * 0.1));
+			$('#hamburger-box').css('width', boxWidth+"px");
+			$('#hamburger').css('height', boxHeight+"px");
+		  currentHamburgerMenuOpenness = percentage;
+		}
+
+		menuOpenAnimID = NO_ANIM;
+
+		function hamburgerMenuSlide(start, end) {
+      if (menuOpenAnimID != NO_ANIM) {
+				clearInterval(menuOpenAnimID);
+			}
+			var duration = 0.2; //in seconds
+			var totalDelta = end - start;
+      var lastAnimTime = new Date().getTime();
+			return function() {
+				var now = new Date().getTime();
+				var timeDelta = now - lastAnimTime;
+				var updatePercentage = (duration * 1000) / timeDelta;
+			  var frameDelta = totalDelta / updatePercentage;
+			  lastAnimTime = now;
+
+				desiredOpenness = currentHamburgerMenuOpenness + frameDelta;
+				if ((totalDelta >= 0 && desiredOpenness >= end) || (totalDelta < 0 && desiredOpenness <= end)) {
+					desiredOpenness = end;
+					clearInterval(menuOpenAnimID);
+					menuOpenAnimID = NO_ANIM;
+				}
+
+				setHamburgerMenuOpenness(desiredOpenness);
+			}
+		}
+
+		function openHamburgerMenu() {
+			menuOpenAnimID = setInterval(hamburgerMenuSlide(0, 1), FRAME_INTERVAL);
+			hamburgerMenuOpen = true;
+			navFadeAnimID = setInterval(navbarFade(1, 0), FRAME_INTERVAL);
+		}
+
+		function closeHamburgerMenu() {
+			menuOpenAnimID = setInterval(hamburgerMenuSlide(1, 0), FRAME_INTERVAL);
+			hamburgerMenuOpen = false;
+			if (!navbarMousedOver) {
+				navFadeAnimID = setInterval(navbarFade(0, 1), FRAME_INTERVAL);
+			}
+		}
+
+		function toggleHamburgerMenu() { hamburgerMenuOpen ? closeHamburgerMenu() : openHamburgerMenu(); }
+
+		$('#hamburger-box').click(function() {
+			toggleHamburgerMenu();
+		})
+
 	</script>
 </body>
 </html>
