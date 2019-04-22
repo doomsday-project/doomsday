@@ -101,17 +101,17 @@
 			backends.forEach(function(b, i) { 
 		]]
 		<div class="certs-content-path-backend-container">
-			<div class="certs-content-label certs-content-backend-label">[[= b.name]]</div>
+			<div class="certs-content-label certs-content-backend-label">[[= lens.escapeHTML(b.name) ]]</div>
 			<div class="certs-content-path-backend-paths-container">
 		[[
 				backends[i].paths.sort(); 
 		]]
-		    <div class="certs-content-value">[[= backends[i].paths[0] ]]</div>
+		    <div class="certs-content-value">[[= lens.escapeHTML(backends[i].paths[0]) ]]</div>
 		[[
 				backends[i].paths.slice(1).forEach(function(path) {
 		]]
 					<div class="horizontal-line"></div>
-					<div class="certs-content-value">[[= path ]]</div>
+					<div class="certs-content-value">[[= lens.escapeHTML(path) ]]</div>
 		[[
 				});
 		]]
@@ -150,7 +150,7 @@
 				if (expired) { expiredClass = " expired-card"; }
 			]]
 			<div class="cert-card[[= expiredClass ]]" [[= (expired ? "" : 'style="background-color: rgb(' + _.color[0] + ',' + _.color[1] + ',' + _.color[2] + ');"') ]] >
-			  [[ lens.include("cert-card-header", { label: "COMMON NAME", value: lens.maybe(_.cert.common_name) }); ]]
+			  [[ lens.include("cert-card-header", { label: "COMMON NAME", value: lens.escapeHTML(lens.maybe(_.cert.common_name, "not provided")) }); ]]
 				<div class="certs-content-body">
 				[[
 				    timefmt = Lens.strftime("%a, %b %d %Y at %I:%M %P", _.cert.not_after );
@@ -623,7 +623,6 @@
 		function deleteCookie(name) {
 			document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
 		}
-
 	</script>
 </body>
 </html>
