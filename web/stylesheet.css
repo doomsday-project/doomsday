@@ -1,6 +1,8 @@
 #viewport {
 	display: flex;
 	width: 100%;
+	height: calc(100vh - 50px);
+	overflow: auto;
 	background: repeating-linear-gradient(
 		45deg,
 		rgba(0, 0, 0, 0),
@@ -9,6 +11,82 @@
 		rgba(0, 0, 0, 0.15) 120px
   );
   padding-top: 50px;
+}
+
+#login {
+	height: 100%;
+	width: 100%;
+	display: none;
+}
+
+#login-page-container {
+	height: 100%;
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+#login-box {
+	background-color: #252525;
+	border-radius: 14px;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	align-content: center;
+	width: 400px;
+}
+
+#login-box label {
+	color: white;
+	width: 100%;
+}
+
+#login-form {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	align-content: center;
+	margin: 1em;
+	width: 100%;
+}
+
+.login-text-box {
+	margin: 0.75em 1.5em;
+	width: 100%;
+	display: flex;
+	flex-wrap: wrap;
+}
+
+.login-text-box input[type=text], input[type=password] {
+	font-size: 20px;
+	width: 100%;
+	border-radius: 6px;
+}
+
+.login-button-box {
+	margin: 0.4em;
+	display: flex;
+	justify-content: center;
+	width: 100%;
+}
+
+.login-button-box input[type=submit] {
+	font-size: 20px;
+	font-family: inherit;
+	border-radius: 6px;
+	padding: 0em 1em;
+}
+
+.login-error {
+	margin: 1em;
+	margin-top: 0;
+	padding: 0.2em;
+	font-size: 16px;
+	width: 90%;
+	text-align: center;
+	border-radius: 6px;
+	background-color: rgb(229, 53, 69);
 }
 
 #navbar {
@@ -59,9 +137,8 @@
 }
 
 #hamburger {
-	color: white;
-	height: 30px;
-	width: 30px;
+	height: 25px;
+	width: 25px;
 	flex: 1 1 auto;
 }
 

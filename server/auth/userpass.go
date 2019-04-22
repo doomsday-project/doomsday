@@ -51,6 +51,13 @@ func (s *sessions) validate(sessionID string) bool {
 	return false
 }
 
+func (s *sessions) expiry(sessionID string) time.Time {
+	s.lock.RLock()
+	ret := s.table[sessionID]
+	s.lock.RUnlock()
+	return ret
+}
+
 type Userpass struct {
 	username string
 	password string
@@ -112,9 +119,11 @@ func (u *Userpass) LoginHandler() http.HandlerFunc {
 			return
 		}
 
+		token := u.sessions.new()
 		w.Header().Set("Content-Type", "application/json")
+		http.SetCookie(w, &http.Cookie{Name: "doomsday-token", Value: token, Path: "/", Expires: u.sessions.expiry(token)})
 		w.WriteHeader(200)
-		w.Write([]byte(fmt.Sprintf(`{"token":"%s"}`+"\n", u.sessions.new())))
+		w.Write([]byte(fmt.Sprintf(`{"token":"%s"}`+"\n", token)))
 	}
 }
 
@@ -122,7 +131,14 @@ func (u *Userpass) TokenHandler() TokenFunc {
 	return func(fn http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			sessionID := r.Header.Get("X-Doomsday-Token")
+			if sessionID == "" {
+				cookie, err := r.Cookie("doomsday-token")
+				if err == nil {
+					sessionID = cookie.Value
+				}
+			}
 			if u.sessions.validate(sessionID) {
+				http.SetCookie(w, &http.Cookie{Name: "doomsday-token", Value: sessionID, Path: "/", Expires: u.sessions.expiry(sessionID)})
 				fn(w, r)
 			} else {
 				w.WriteHeader(401)
