@@ -322,6 +322,18 @@
 		  HAMBURGER_BOX_PADDING = hamburgerBox.innerWidth() - NORMAL_HAMBURGER_WIDTH;
 
 			var authType = getAuthType();
+			if (authType == "None") {
+				logout_button = $('#logout-button')
+				logout_button.addClass('hamburger-menu-button-inactive');
+				logout_button.removeClass('navbar-button hamburger-menu-button');
+				logout_button.mouseover(function() { logout_button.text('auth is turned off'); });
+				logout_button.mouseout(function() { logout_button.text('logout'); });
+			} else {
+				$('#logout-button').click(function() {
+					closeHamburgerMenu();
+					handleLogout();
+				})
+			}
 			if (authType == "Userpass" && getCookie('doomsday-token') == "") {
 				gotoLogin();
 			} else {
@@ -548,10 +560,6 @@
 			toggleHamburgerMenu();
 		})
 
-		$('#logout-button').click(function() {
-			closeHamburgerMenu();
-			handleLogout();
-		})
 
 		function getCookie(name) {
 			var state = 0;
