@@ -292,10 +292,11 @@
 
 						$("#certs").template("cert-list-group", {lists: lists});
 						$("#certs").show();
+			      certUpdateID = setTimeout(updateCertList, 60 * 1000);
 					},
-					400: function(data) {throw {code: 400, message: "Bad request"};},
-					401: function(data) {deleteCookie('doomsday-token'); throw {code: 401, message: "Your session has expired"};},
-					500: function(data) {throw {code: 500, message: "Internal server error"};}
+					400: function(data) {gotoLogin("Bad request");},
+					401: function(data) {deleteCookie('doomsday-token'); gotoLogin("Your session has expired");},
+					500: function(data) {gotoLogin("Internal server error");}
 				}
 			})
 		}
@@ -344,9 +345,6 @@
 		certUpdateID = -1;
 
 		function handleLogin(e) {
-			console.log('Submitting');
-			console.log('Username is: ' + $(e.target).find('input[name=username]').val());
-			console.log('Password is: ' + $(e.target).find('input[name=password]').val());
 			var username = $('input[name=username]').val();
 			var password = $('input[name=password]').val();
 			$.ajax({
@@ -391,24 +389,11 @@
 		}
 
 		function gotoDashboard() {
-			try {
-				updateCertList();
-			} catch (e) {
-				gotoLogin(e.message);
-				return
-			}
-			certUpdateID = setInterval(function() {
-				try {
-					updateCertList();
-				} catch (e) {
-					gotoLogin(e.message);
-					return
-				}
-			}, 60 * 1000);
-			
 			$("#login").hide();
 			$("#login-form").off("submit");
 			$('#hamburger-box').show();
+
+			updateCertList();
 		}
 
     navbarMousedOver = false;

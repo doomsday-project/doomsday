@@ -1,0 +1,9 @@
+web/index.html:
+  servePath: /
+  mimeType: text/html
+web/stylesheet.css: 
+  servePath: /web/assets/stylesheet.css
+  mimeType: text/css
+web/lens.js:
+  servePath: /web/assets/lens.js
+  mimeType: application/javascript

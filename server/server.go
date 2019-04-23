@@ -88,10 +88,16 @@ func Start(conf Config) error {
 	router.HandleFunc("/v1/cache", auth(getCache(manager))).Methods("GET")
 	router.HandleFunc("/v1/cache/refresh", auth(refreshCache(manager))).Methods("POST")
 
-	for file, servePath := range conf.Server.Dev.Mappings {
-		servePath = "/" + strings.TrimPrefix(servePath, "/")
-		log.WriteF("Serving %s at %s", file, servePath)
-		router.HandleFunc(servePath, serveFile(file)).Methods("GET")
+	if len(conf.Server.Dev.Mappings) > 0 {
+		for file, servePath := range conf.Server.Dev.Mappings {
+			servePath = "/" + strings.TrimPrefix(servePath, "/")
+			log.WriteF("Serving %s at %s", file, servePath)
+			router.HandleFunc(servePath, serveDevFile(file)).Methods("GET")
+		}
+	} else {
+		for path, value := range webStatics {
+			router.HandleFunc(path, serveFile(value.Content, value.MIMEType)).Methods("GET")
+		}
 	}
 
 	log.WriteF("Beginning listening on port %d", conf.Server.Port)
@@ -167,7 +173,15 @@ func refreshCache(manager *SourceManager) func(w http.ResponseWriter, r *http.Re
 	}
 }
 
-func serveFile(filepath string) func(w http.ResponseWriter, r *http.Request) {
+func serveFile(content, mimeType string) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", mimeType)
+		w.WriteHeader(200)
+		w.Write([]byte(content))
+	}
+}
+
+func serveDevFile(filepath string) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		f, err := os.Open(filepath)
 		if err != nil {
