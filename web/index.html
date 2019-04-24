@@ -372,7 +372,7 @@
 		}
 
 		function gotoLogin(message) {
-			clearInterval(certUpdateID);
+			clearTimeout(certUpdateID);
 			certUpdateID = -1;
 			$("#certs").hide();
 			$("#hamburger-box").hide();
