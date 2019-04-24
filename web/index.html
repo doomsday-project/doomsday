@@ -160,7 +160,7 @@
 							//timefmt = "<s>"+timefmt+"</s> EXPIRED";
 						}
 						lens.include("cert-card-line", { label: label, value: timefmt });
-						lens.include("cert-card-path-list", { paths: _.cert.paths });
+						lens.include("cert-card-path-list", { paths: [ _.cert.path ] });
 				]]
 					</div>
 			</div>
