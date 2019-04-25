@@ -443,3 +443,20 @@ div {
   }
 }
 
+@media only screen and (min-width: 2400px) {
+  .cert-grid-container {
+	  width: 25%;
+  }
+}
+
+@media only screen and (min-width: 3000px) {
+  .cert-grid-container {
+	  width: 20%;
+  }
+}
+
+@media only screen and (min-width: 3600px) {
+  .cert-grid-container {
+	  width: 16.66666%;
+  }
+}
