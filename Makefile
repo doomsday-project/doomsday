@@ -8,7 +8,7 @@ ifneq ("$(DIRTY_LINE)", "")
   DIRTY := +
 endif
 VERSION ?= development
-LDFLAGS := -X "github.com/thomasmmitchell/doomsday/version.Version=$(VERSION)-$(COMMIT_HASH)$(DIRTY)"
+LDFLAGS := -X "github.com/doomsday-project/doomsday/version.Version=$(VERSION)-$(COMMIT_HASH)$(DIRTY)"
 BUILD := go build -v -ldflags='$(LDFLAGS)' -o $(OUTPUT_NAME) $(BUILD_TARGET)
 
 .PHONY: build darwin linux all clean embed
@@ -27,7 +27,7 @@ linux:
 all: darwin linux
 
 embed:
-	go run web/embed/main.go web/embed/mappings.yml
+	GOOS="" GOARCH="" go run web/embed/main.go web/embed/mappings.yml
 
 clean:
 	rm -f $(APP_NAME) $(APP_NAME)-darwin $(APP_NAME)-linux
