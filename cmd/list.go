@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doomsday-project/doomsday/client/doomsday"
+	"github.com/doomsday-project/doomsday/duration"
 	"github.com/olekukonko/tablewriter"
 	"github.com/starkandwayne/goutils/ansi"
-	"github.com/thomasmmitchell/doomsday/client/doomsday"
-	"github.com/thomasmmitchell/doomsday/duration"
 )
 
 type listCmd struct {

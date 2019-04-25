@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doomsday-project/doomsday/client/doomsday"
+	"github.com/doomsday-project/doomsday/server/auth"
+	"github.com/doomsday-project/doomsday/server/logger"
+	"github.com/doomsday-project/doomsday/storage"
+	"github.com/doomsday-project/doomsday/version"
 	"github.com/gorilla/mux"
-	"github.com/thomasmmitchell/bosh-complete/version"
-	"github.com/thomasmmitchell/doomsday/client/doomsday"
-	"github.com/thomasmmitchell/doomsday/server/auth"
-	"github.com/thomasmmitchell/doomsday/server/logger"
-	"github.com/thomasmmitchell/doomsday/storage"
 )
 
 func Start(conf Config) error {

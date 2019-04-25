@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cloudfoundry-incubator/credhub-cli/credhub"
-	"github.com/thomasmmitchell/doomsday/storage/uaa"
+	"github.com/doomsday-project/doomsday/storage/uaa"
 )
 
 type ConfigServerAccessor struct {

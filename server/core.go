@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/thomasmmitchell/doomsday/storage"
+	"github.com/doomsday-project/doomsday/storage"
 )
 
 type Core struct {

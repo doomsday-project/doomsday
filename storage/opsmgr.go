@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/thomasmmitchell/doomsday/storage/uaa"
+	"github.com/doomsday-project/doomsday/storage/uaa"
 )
 
 type OmAccessor struct {

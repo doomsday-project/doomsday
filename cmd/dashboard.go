@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/doomsday-project/doomsday/client/doomsday"
 	"github.com/olekukonko/tablewriter"
-	"github.com/thomasmmitchell/doomsday/client/doomsday"
 )
 
 type dashboardCmd struct {

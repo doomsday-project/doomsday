@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/doomsday-project/doomsday/client/doomsday"
+	"github.com/doomsday-project/doomsday/version"
 	"github.com/starkandwayne/goutils/ansi"
-	"github.com/thomasmmitchell/doomsday/client/doomsday"
-	"github.com/thomasmmitchell/doomsday/version"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
 

@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/thomasmmitchell/doomsday/server/auth"
+	"github.com/doomsday-project/doomsday/server/auth"
 )
 
 type Client struct {

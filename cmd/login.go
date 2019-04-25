@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/thomasmmitchell/doomsday/server/auth"
+	"github.com/doomsday-project/doomsday/server/auth"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
