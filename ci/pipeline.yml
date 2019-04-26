@@ -1,0 +1,89 @@
+name: doomsday
+
+resources:
+- name: doomsday
+  type: git
+  source:
+    uri: https://github.com/doomsday-project/doomsday
+    branch: master
+    username: ((github.username))
+    password: ((github.access-token))
+- name: version
+  type: semver
+  source:
+    driver:            s3
+    bucket:            doomsday-project
+    region_name:       us-east-1
+    key:               version
+    access_key_id:     ((cfcommunity.access))
+    secret_access_key: ((cfcommunity.secret))
+    initial_version:   '0.5.1'
+
+jobs:
+- name: major
+  public: true
+  plan:
+  - do:
+    - { get: version, trigger: false, params: {bump: major} }
+    - { put: version,                 params: {file: version/number} }
+
+- name: minor
+  public: true
+  plan:
+  - do:
+    - { get: version, trigger: false, params: {bump: minor} }
+    - { put: version,                 params: {file: version/number} }
+
+- name: patch
+  public: true
+  plan:
+  - do:
+    - { get: version, trigger: false, params: {bump: patch} }
+    - { put: version,                 params: {file: version/number} }
+
+- name: build
+  plan:
+  - get: doomsday
+    trigger: true
+  - get: version
+    trigger: true
+    params:
+      pre: rc
+  - task: build
+    config:
+      platform: linux
+      image_resource: &image
+        type: docker-image
+        source:
+          repository: golang
+          tag: '1.12.4'
+      inputs:
+      - name: doomsday
+      - name: version
+      outputs:
+      - name: doomsday-binary
+      run:
+        path: bash
+        args: 
+        - '-ce'
+        - |
+            [[ -n $GOPATH ]]
+            export VERSION="$(cat version/version)"
+            WORKDIR=$(pwd) 
+            mkdir -p "$GOPATH/src/github.com/doomsday-project"
+            cp -r doomsday "$GOPATH/src/github.com/doomsday-project/"
+            pushd "$GOPATH/src/github.com/doomsday-project/doomsday"
+            make all
+            cp doomsday-darwin $WORKDIR/doomsday-binary/
+            cp doomsday-linux $WORKDIR/doomsday-binary/
+            git diff --shortstat 2> /dev/null
+  - task: show-version
+    config:
+      platform: linux
+      image_resource: *image
+      inputs:
+      - name: doomsday-binary
+      run:
+        path: ./doomsday-linux
+        args: ['--version']
+        dir: doomsday-binary
