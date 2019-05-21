@@ -2,359 +2,490 @@ package vaultkv_test
 
 import (
 	"fmt"
-	"sort"
-	"strings"
 
-	"github.com/cloudfoundry-community/vaultkv"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/cloudfoundry-community/vaultkv"
 )
 
-var _ = Describe("Kv", func() {
-	//This is a hack because I don't want to refactor _everything_ in these tests
-	var getAssertionPath string
+var _ = Describe("KV", func() {
+	const testMountName = "zip/zop/zoobity/bop"
+	var testkv *vaultkv.KV
+	BeforeEach(func() {
+		InitAndUnsealVault()
+		testkv = vault.NewKV()
+		Expect(testkv).NotTo(BeNil())
+	})
 
-	var AssertGetEquals = func(expected map[string]string) func() {
-		return func() {
-			output := make(map[string]string)
-			err = vault.Get(getAssertionPath, &output)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(output).To(Equal(expected))
-		}
-	}
-
-	var AssertExists = func(exists bool) func() {
-		var fn func()
-		if exists {
-			fn = func() {
-				err = vault.Get(getAssertionPath, nil)
-				AssertNoError()()
-			}
-		} else {
-			fn = func() {
-				err = vault.Get(getAssertionPath, nil)
-				AssertErrorOfType(&vaultkv.ErrNotFound{})
-			}
-		}
-
-		return fn
-	}
-
-	When("the vault is not initialized", func() {
-		Describe("Get", func() {
+	unityTests := func() {
+		Describe("MountPath", func() {
+			var mountOutput string
 			JustBeforeEach(func() {
-				err = vault.Get("secret/sure/whatever", nil)
+				mountOutput, err = testkv.MountPath(fmt.Sprintf("%s/boop", testMountName))
 			})
-			It("should return ErrUninitialized", AssertErrorOfType(&vaultkv.ErrUninitialized{}))
+
+			It("should return the proper mount name", func() {
+				By("not returning an error")
+				Expect(err).NotTo(HaveOccurred())
+
+				By("having the returned mount name be the same as the created mount's name")
+				Expect(mountOutput).To(BeEquivalentTo(testMountName))
+			})
 		})
 
 		Describe("Set", func() {
-			JustBeforeEach(func() {
-				err = vault.Set("secret/sure/whatever", map[string]string{"foo": "bar"})
-			})
-			It("should return ErrUninitialized", AssertErrorOfType(&vaultkv.ErrUninitialized{}))
-		})
-
-		Describe("Delete", func() {
-			JustBeforeEach(func() {
-				err = vault.Delete("secret/sure/whatever")
-			})
-			It("should return ErrUninitialized", AssertErrorOfType(&vaultkv.ErrUninitialized{}))
-		})
-
-		Describe("List", func() {
-			JustBeforeEach(func() {
-				_, err = vault.List("secret/sure/whatever")
-			})
-
-			It("should return ErrUninitialized", AssertErrorOfType(&vaultkv.ErrUninitialized{}))
-		})
-	})
-
-	When("the vault is initialized", func() {
-		var initOut *vaultkv.InitVaultOutput
-		BeforeEach(func() {
-			initOut, err = vault.InitVault(vaultkv.InitConfig{
-				Shares:    1,
-				Threshold: 1,
-			})
-			AssertNoError()()
-		})
-
-		When("the vault is sealed", func() {
-			Describe("Get", func() {
-				JustBeforeEach(func() {
-					err = vault.Get("secret/sure/whatever", nil)
-				})
-				It("should return ErrSealed", AssertErrorOfType(&vaultkv.ErrSealed{}))
-			})
-
-			Describe("Set", func() {
-				JustBeforeEach(func() {
-					err = vault.Set("secret/sure/whatever", map[string]string{"foo": "bar"})
-				})
-				It("should return ErrSealed", AssertErrorOfType(&vaultkv.ErrSealed{}))
-			})
-
-			Describe("Delete", func() {
-				JustBeforeEach(func() {
-					err = vault.Delete("secret/sure/whatever")
-				})
-				It("should return ErrSealed", AssertErrorOfType(&vaultkv.ErrSealed{}))
-			})
-
-			Describe("List", func() {
-				JustBeforeEach(func() {
-					_, err = vault.List("secret/sure/whatever")
-				})
-
-				It("should return ErrSealed", AssertErrorOfType(&vaultkv.ErrSealed{}))
-			})
-		})
-
-		When("the vault is unsealed", func() {
+			var testSetPath string
+			var testSetValues map[string]string
+			var testSetOptions *vaultkv.KVSetOpts
+			var testVersionOutput vaultkv.KVVersion
 			BeforeEach(func() {
-				_, err = vault.Unseal(initOut.Keys[0])
-				AssertNoError()
+				testSetPath = fmt.Sprintf("%s/boop", testMountName)
 			})
 
-			Describe("Setting something in the Vault", func() {
-				var testPath string
-				var testValue map[string]string
+			JustBeforeEach(func() {
+				testVersionOutput, err = testkv.Set(testSetPath, testSetValues, testSetOptions)
+			})
+
+			AfterEach(func() {
+				testSetValues = nil
+				testSetOptions = nil
+				testVersionOutput = vaultkv.KVVersion{}
+			})
+
+			Context("With a non-empty map input", func() {
 				BeforeEach(func() {
-					testPath = "secret/foo"
-					testValue = map[string]string{
-						"foo":  "bar",
-						"beep": "boop",
-					}
+					testSetValues = map[string]string{"foo": "bar"}
 				})
 
-				JustBeforeEach(func() {
-					err = vault.Set(testPath, testValue)
+				It("should write the proper values to the key", func() {
+					By("not erroring")
+					Expect(err).NotTo(HaveOccurred())
+
+					By("returning the proper version output")
+					Expect(testVersionOutput.Version).To(BeEquivalentTo(uint(1)))
 				})
 
-				When("the value is nil", func() {
-					BeforeEach(func() {
-						testValue = nil
-						getAssertionPath = testPath
-					})
-
-					It("should return ErrBadRequest", AssertErrorOfType(&vaultkv.ErrBadRequest{}))
-					Specify("Get should find no key at this path", AssertExists(false))
-				})
-
-				When("the path is doesn't correspond to a mounted backend", func() {
-					BeforeEach(func() {
-						testPath = "notabackend/foo"
-					})
-
-					It("should return ErrNotFound", AssertErrorOfType(&vaultkv.ErrNotFound{}))
-					Specify("Get should find no key at this path", AssertExists(false))
-				})
-
-				When("the path has a leading slash", func() {
-					BeforeEach(func() {
-						testPath = "/secret/foo"
-						getAssertionPath = strings.TrimPrefix(testPath, "/")
-					})
-
-					It("should not return an error", AssertNoError())
-					Specify("Get should find the key at the path without a slash",
-						AssertExists(true))
-					Specify("Get should find the inserted value at the path without a slash",
-						AssertGetEquals(map[string]string{"foo": "bar", "beep": "boop"}))
-				})
-
-				When("the path has a trailing slash", func() {
-					BeforeEach(func() {
-						testPath = "secret/foo/"
-						getAssertionPath = strings.TrimSuffix(testPath, "/")
-					})
-
-					It("should not return an error", AssertNoError())
-					Specify("Get should find the key at the path without a slash",
-						AssertExists(true))
-					Specify("Get should find the inserted value at the path without a slash",
-						AssertGetEquals(map[string]string{"foo": "bar", "beep": "boop"}))
-				})
-
-				When("setting an already set key", func() {
-					var secondTestValue map[string]string
-					BeforeEach(func() {
-						secondTestValue = map[string]string{
-							"thisisanotherkey": "thisisanothervalue",
-						}
-						getAssertionPath = testPath
-					})
-
+				Describe("List", func() {
+					var testListPath string
+					var testListOutput []string
 					JustBeforeEach(func() {
-						err = vault.Set(testPath, secondTestValue)
+						testListOutput, err = testkv.List(testListPath)
 					})
 
-					It("should not return an error", AssertNoError())
-					Specify("Get should find the value that was added second",
-						AssertGetEquals(map[string]string{"thisisanotherkey": "thisisanothervalue"}))
-				})
-
-				Describe("Get", func() {
-					var getTestPath string
-					var getOutputValue map[string]string
-
-					var AssertGetEqualsSet = func() func() {
-						return func() {
-							Expect(getOutputValue).To(Equal(testValue))
-						}
-					}
-					BeforeEach(func() {
-						getOutputValue = make(map[string]string)
-					})
-
-					JustBeforeEach(func() {
-						err = vault.Get(getTestPath, &getOutputValue)
-					})
-
-					When("the key exists", func() {
+					When("the path exists", func() {
 						BeforeEach(func() {
-							getTestPath = testPath
+							_, err = testkv.Set(fmt.Sprintf("%s/foo/bar", testMountName), testSetValues, nil)
+							Expect(err).NotTo(HaveOccurred())
+							testListPath = testMountName
 						})
 
-						It("should not return an error", AssertNoError())
-						It("should return the same value as what was inserted", AssertGetEqualsSet())
+						It("should list the keys", func() {
+							By("not erroring")
+							Expect(err).NotTo(HaveOccurred())
+
+							By("returning the expected keys")
+							Expect(testListOutput).To(Equal([]string{"boop", "foo/"}))
+						})
 					})
 
-					When("the key doesn't exist", func() {
+					When("the path does not exist", func() {
 						BeforeEach(func() {
-							getTestPath = fmt.Sprintf("%sabcd", testPath)
+							testListPath = fmt.Sprintf("%s/this/shouldnt/exist", testMountName)
 						})
 
 						It("should return ErrNotFound", AssertErrorOfType(&vaultkv.ErrNotFound{}))
 					})
 				})
 
-				Describe("Delete", func() {
-					var deleteTestPath string
+				Describe("Get", func() {
+					var testGetOutput map[string]string
+					var testGetVersionOutput vaultkv.KVVersion
 					JustBeforeEach(func() {
-						err = vault.Delete(deleteTestPath)
+						testGetOutput = map[string]string{}
+						testGetVersionOutput, err = testkv.Get(testSetPath, &testGetOutput, nil)
 					})
 
-					When("the key exists", func() {
-						BeforeEach(func() {
-							deleteTestPath = testPath
-							getAssertionPath = testPath
-						})
+					It("should get the key", func() {
+						By("not erroring")
+						Expect(err).NotTo(HaveOccurred())
 
-						It("should not return an error", AssertNoError())
-						Specify("Get should not find the key", AssertExists(false))
-					})
+						By("returning the same version info as the Set")
+						Expect(testGetVersionOutput).To(Equal(testVersionOutput))
 
-					When("the key doesn't exist", func() {
-						BeforeEach(func() {
-							deleteTestPath = fmt.Sprintf("%sabcd", testPath)
-						})
-
-						It("should not return an error", AssertNoError())
+						By("returning the same values that were set")
+						Expect(testGetOutput).To(Equal(testSetValues))
 					})
 				})
 
-				Describe("Adding another key with multiple parts", func() {
-					var secondTestPath string
-					var secondTestValue map[string]string
-					BeforeEach(func() {
-						secondTestPath = "secret/foo/bar"
-						secondTestValue = map[string]string{
-							"werealljustlittlebabybirds": "peckingourwayoutofourshells",
-						}
-					})
-
+				Describe("Delete", func() {
+					var testDeleteVersions []uint
 					JustBeforeEach(func() {
-						err = vault.Set(secondTestPath, secondTestValue)
-						AssertNoError()()
+						err = testkv.Delete(testSetPath, &vaultkv.KVDeleteOpts{
+							Versions:  testDeleteVersions,
+							V1Destroy: true,
+						})
+					})
+					AfterEach(func() {
+						testDeleteVersions = nil
+					})
+					Context("Not specifying a version to delete", func() {
+						It("should delete the only (newest) version", func() {
+							By("not erroring")
+							Expect(err).NotTo(HaveOccurred())
+
+							By("Get being unable to find it")
+							_, err = testkv.Get(testSetPath, nil, nil)
+							AssertErrorOfType(&vaultkv.ErrNotFound{})()
+						})
 					})
 
-					Describe("List", func() {
-						var listTestPath string
-						var listTestOutput []string
+					Context("Specifying a version to delete", func() {
+						When("the version exists", func() {
+							BeforeEach(func() {
+								testDeleteVersions = []uint{1}
+							})
 
+							It("should delete the specified version", func() {
+								By("not erroring")
+								Expect(err).NotTo(HaveOccurred())
+
+								By("Get being unable to find it")
+								_, err = testkv.Get(testSetPath, nil, nil)
+								AssertErrorOfType(&vaultkv.ErrNotFound{})()
+							})
+
+							Context("and then deleting it again", func() {
+								JustBeforeEach(func() {
+									err = testkv.Delete(testSetPath, &vaultkv.KVDeleteOpts{
+										Versions:  testDeleteVersions,
+										V1Destroy: true,
+									})
+								})
+
+								It("should not err", func() { Expect(err).NotTo(HaveOccurred()) })
+							})
+						})
+
+						When("the version does not exist", func() {
+							BeforeEach(func() {
+								testDeleteVersions = []uint{12}
+							})
+
+							It("should not err", func() { Expect(err).NotTo(HaveOccurred()) })
+						})
+					})
+				})
+
+				Describe("Destroy", func() {
+					When("the version exists and it is the only version", func() {
 						JustBeforeEach(func() {
-							listTestOutput, err = vault.List(listTestPath)
+							err = testkv.Destroy(testSetPath, []uint{1})
 						})
 
-						//Order doesn't matter
-						var AssertListEquals = func(expected []string) func() {
-							return func() {
-								Expect(listTestOutput).ToNot(BeNil())
-								Expect(expected).ToNot(BeNil())
-								sort.Strings(expected)
-								sort.Strings(listTestOutput)
-								Expect(listTestOutput).To(Equal(expected))
-							}
-						}
+						It("should delete the metadata", func() {
+							By("not erroring")
+							Expect(err).NotTo(HaveOccurred())
 
-						Context("on `secret'", func() {
-							BeforeEach(func() {
-								listTestPath = "secret"
-							})
+							By("Get being unable to find the key")
+							_, err = testkv.Get(testSetPath, nil, nil)
+							AssertErrorOfType(&vaultkv.ErrNotFound{})
 
-							It("should not return an error", AssertNoError())
-							It("should return the correct list of paths", AssertListEquals([]string{"foo", "foo/"}))
+							By("Versions being unable to find the key")
+							_, err = testkv.Versions(testSetPath)
+							AssertErrorOfType(&vaultkv.ErrNotFound{})
+						})
+					})
+
+					When("the version does not exist", func() {
+						JustBeforeEach(func() {
+							err = testkv.Destroy(testSetPath, []uint{12})
 						})
 
-						Context("on the dir of the nested key", func() {
-							BeforeEach(func() {
-								listTestPath = "secret/foo"
-							})
+						It("should not delete anything", func() {
+							By("not erroring")
+							Expect(err).NotTo(HaveOccurred())
 
-							It("should not return an error", AssertNoError())
-							It("should return the correct list of paths", AssertListEquals([]string{"bar"}))
+							By("Get being able to find the key")
+							_, err = testkv.Get(testSetPath, nil, nil)
+							Expect(err).NotTo(HaveOccurred())
+
+							By("Versions being able to find the key")
+							var meta []vaultkv.KVVersion
+							meta, err = testkv.Versions(testSetPath)
+							Expect(err).NotTo(HaveOccurred())
+
+							By("Versions reporting that version 1 still exists")
+							Expect(meta).To(HaveLen(1))
+						})
+					})
+
+					When("the path does not exist", func() {
+						JustBeforeEach(func() {
+							err = testkv.Destroy(testSetPath+"abcd", []uint{12})
 						})
 
-						When("the path doesn't exist", func() {
-							BeforeEach(func() {
-								listTestPath = "secret/boo/hiss"
-							})
+						It("should not err", func() { Expect(err).NotTo(HaveOccurred()) })
+					})
+				})
 
-							It("should return an ErrNotFound", AssertErrorOfType(&vaultkv.ErrNotFound{}))
+				Describe("DestroyAll", func() {
+					JustBeforeEach(func() {
+						err = testkv.DestroyAll(testSetPath)
+					})
+
+					It("should delete the metadata", func() {
+						By("not erroring")
+						Expect(err).NotTo(HaveOccurred())
+
+						By("Get being unable to find the key")
+						_, err = testkv.Get(testSetPath, nil, nil)
+						AssertErrorOfType(&vaultkv.ErrNotFound{})
+
+						By("Versions being unable to find the key")
+						_, err = testkv.Versions(testSetPath)
+						AssertErrorOfType(&vaultkv.ErrNotFound{})
+					})
+				})
+			})
+		})
+	}
+
+	Context("With a KV v1 mount", func() {
+		BeforeEach(func() {
+			mountType := vaultkv.MountTypeKV
+			if parseSemver(currentVaultVersion).LessThan(semver{0, 8, 0}) {
+				mountType = vaultkv.MountTypeGeneric
+			}
+			err = vault.EnableSecretsMount(testMountName, vaultkv.Mount{
+				Type:    mountType,
+				Options: vaultkv.KVMountOptions{}.WithVersion(1),
+			})
+
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		unityTests()
+
+		//There are some things that we cannot make exactly the same between kv v1 and v2. We test those things here.
+		Describe("v1 specific", func() {
+			Describe("isKVv2Mount", func() {
+				var mountName string
+				var isV2 bool
+				JustBeforeEach(func() {
+					mountName, isV2, err = vault.IsKVv2Mount(testMountName)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				It("should return the mount name and that it is not a v2 mount", func() {
+					Expect(mountName).To(BeEquivalentTo(testMountName))
+					Expect(isV2).To(BeFalse())
+				})
+			})
+
+			Describe("Version", func() {
+				var testOutputVersion uint
+				JustBeforeEach(func() {
+					testOutputVersion, err = testkv.MountVersion(testMountName)
+				})
+
+				It("should return 1", func() {
+					By("not erroring")
+					Expect(err).NotTo(HaveOccurred())
+					By("returning the correct version number")
+					Expect(testOutputVersion).To(BeEquivalentTo(1))
+				})
+			})
+
+			Describe("Set", func() {
+				var testSetPath string
+				var testSetValues map[string]string
+				var testVersionOutput vaultkv.KVVersion
+				BeforeEach(func() {
+					testSetPath = fmt.Sprintf("%s/boop", testMountName)
+				})
+
+				JustBeforeEach(func() {
+					testSetValues = map[string]string{"foo": "bar"}
+					testVersionOutput, err = testkv.Set(testSetPath, testSetValues, nil)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				Describe("Getting a version >1", func() {
+					JustBeforeEach(func() {
+						_, err = testkv.Get(testSetPath, nil, &vaultkv.KVGetOpts{Version: 2})
+					})
+
+					It("should return ErrNotFound", func() {
+						AssertErrorOfType(&vaultkv.ErrNotFound{})
+					})
+				})
+
+				When("Overwriting the previously Set key", func() {
+					JustBeforeEach(func() {
+						testSetValues = map[string]string{"beep": "boop"}
+						testVersionOutput, err = testkv.Set(testSetPath, testSetValues, nil)
+					})
+
+					It("should overwrite the key without issue", func() {
+						By("not erroring")
+						Expect(err).NotTo(HaveOccurred())
+
+						By("returning that the version is one")
+						Expect(testVersionOutput.Version).To(BeEquivalentTo(1))
+					})
+				})
+
+				Describe("Delete with V1Destroy set to false", func() {
+					JustBeforeEach(func() {
+						err = testkv.Delete(testSetPath, &vaultkv.KVDeleteOpts{
+							Versions:  []uint{1},
+							V1Destroy: false,
 						})
+					})
+
+					It("should return ErrKVUnsupported", func() {
+						AssertErrorOfType(&vaultkv.ErrKVUnsupported{})
+					})
+				})
+
+				Describe("Undelete", func() {
+					JustBeforeEach(func() {
+						err = testkv.Undelete(testSetPath, []uint{1})
+					})
+					It("should return ErrKVUnsupported", func() {
+						AssertErrorOfType(&vaultkv.ErrKVUnsupported{})
+					})
+				})
+			})
+		})
+	})
+
+	Context("With a KV v2 mount", func() {
+		BeforeEach(func() {
+			if parseSemver(currentVaultVersion).LessThan(semver{0, 10, 0}) {
+				Skip("This version of Vault does not support KVv2")
+			} else {
+				err = vault.EnableSecretsMount(testMountName, vaultkv.Mount{
+					Type:    vaultkv.MountTypeKV,
+					Options: vaultkv.KVMountOptions{}.WithVersion(2),
+				})
+			}
+
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		unityTests()
+
+		Describe("KV v2 specific", func() {
+			Describe("isKVv2Mount", func() {
+				var mountName string
+				var isV2 bool
+				JustBeforeEach(func() {
+					mountName, isV2, err = vault.IsKVv2Mount(testMountName)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				Specify("should return the mount name and that it is a v2 mount", func() {
+					Expect(mountName).To(BeEquivalentTo(testMountName))
+					Expect(isV2).To(BeTrue())
+				})
+			})
+
+			Describe("Version", func() {
+				var testOutputVersion uint
+				JustBeforeEach(func() {
+					testOutputVersion, err = testkv.MountVersion(testMountName)
+				})
+				It("should return 2", func() {
+					By("not erroring")
+					Expect(err).NotTo(HaveOccurred())
+					By("returning the correct version number")
+					Expect(testOutputVersion).To(BeEquivalentTo(2))
+				})
+			})
+
+			Describe("Set", func() {
+				var testVersionOutput vaultkv.KVVersion
+				var testSetPath string
+				var testSetValue map[string]string
+				JustBeforeEach(func() {
+					testSetPath = fmt.Sprintf("%s/testfield", testMountName)
+					testSetValue = map[string]string{"foo": "bar"}
+					testVersionOutput, err = testkv.Set(testSetPath, testSetValue, nil)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
+				Describe("setting another version", func() {
+					var testVersionOutput2 vaultkv.KVVersion
+					var testSetValue2 map[string]string
+					JustBeforeEach(func() {
+						testSetValue2 = map[string]string{"beep": "boop"}
+						testVersionOutput2, err = testkv.Set(testSetPath, testSetValue2, nil)
+						Expect(err).NotTo(HaveOccurred())
+					})
+
+					It("should have version 2", func() {
+						Expect(testVersionOutput2.Version).To(BeEquivalentTo(2))
 					})
 
 					Describe("Get", func() {
-						var getTestPath string
-						var getOutputValue map[string]string
-
-						BeforeEach(func() {
-							getOutputValue = make(map[string]string)
-						})
+						var testGetVersionOutput vaultkv.KVVersion
+						var testGetValue map[string]string
+						var testGetVersion uint
 
 						JustBeforeEach(func() {
-							err = vault.Get(getTestPath, &getOutputValue)
+							testGetVersionOutput, err = testkv.Get(testSetPath, &testGetValue, &vaultkv.KVGetOpts{Version: testGetVersion})
+							Expect(err).NotTo(HaveOccurred())
 						})
-						Context("on the nested key", func() {
-							BeforeEach(func() {
-								getTestPath = secondTestPath
-							})
 
-							It("should not return an error", AssertNoError())
-							It("should return the correct value", func() {
-								Expect(getOutputValue).To(Equal(secondTestValue))
+						Context("getting version 1", func() {
+							BeforeEach(func() { testGetVersion = 1 })
+							It("should get the first version", func() {
+								Expect(testGetVersionOutput.Version).To(Equal(testGetVersion))
+								Expect(testGetValue).To(Equal(testSetValue))
+							})
+						})
+
+						Context("getting version 2", func() {
+							BeforeEach(func() { testGetVersion = 2 })
+							It("should get the second version", func() {
+								Expect(testGetVersionOutput.Version).To(Equal(testGetVersion))
+								Expect(testGetValue).To(Equal(testSetValue2))
 							})
 						})
 					})
+				})
 
-					Describe("Delete", func() {
-						var deleteTestPath string
+				Describe("Delete", func() {
+					JustBeforeEach(func() {
+						err = testkv.Delete(testSetPath, &vaultkv.KVDeleteOpts{Versions: []uint{testVersionOutput.Version}})
+						Expect(err).NotTo(HaveOccurred())
+					})
+
+					It("should have the version marked as deleted", func() {
+						var versionData []vaultkv.KVVersion
+						versionData, err = testkv.Versions(testSetPath)
+						Expect(versionData).To(HaveLen(1))
+						Expect(versionData[0].Deleted).To(BeTrue())
+					})
+					Describe("Undelete", func() {
 						JustBeforeEach(func() {
-							err = vault.Delete(deleteTestPath)
+							err = testkv.Undelete(testSetPath, []uint{testVersionOutput.Version})
 						})
-						Context("on the nested key", func() {
-							BeforeEach(func() {
-								deleteTestPath = secondTestPath
-								getAssertionPath = deleteTestPath
-							})
 
-							It("should not return an error", AssertNoError())
-							Specify("Get should not find the key", AssertExists(false))
+						It("should undelete the secret", func() {
+							By("not erroring")
+							Expect(err).NotTo(HaveOccurred())
+							By("having Get fetch the secret that was initially inserted")
+							value := map[string]string{}
+							version, err := testkv.Get(testSetPath, &value, nil)
+							Expect(err).NotTo(HaveOccurred())
+							Expect(version.Version).To(Equal(testVersionOutput.Version))
+							Expect(value).To(Equal(testSetValue))
 						})
 					})
+
 				})
 			})
 		})

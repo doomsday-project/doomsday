@@ -2,7 +2,8 @@ package vaultkv
 
 import (
 	"encoding/json"
-	"strings"
+	"fmt"
+	"regexp"
 )
 
 //Rekey represents a rekey operation currently in progress in the Vault. This
@@ -41,17 +42,13 @@ type RekeyState struct {
 	Backup          bool     `json:"backup"`
 }
 
-//NewRekey will cancel the current rekey if one is in progress. If starting a
-// rekey is successful, a *Rekey is returned containing the necessary state
-// for submitting keys for this rekey operation.
+//NewRekey will start a new rekey operation. If successful, a *Rekey is
+//returned containing the necessary state for submitting keys for this rekey
+//operation.
 func (v *Client) NewRekey(conf RekeyConfig) (*Rekey, error) {
-	err := v.rekeyCancel()
+	err := v.rekeyStart(conf)
 	if err != nil {
-		return nil, err
-	}
-
-	err = v.rekeyStart(conf)
-	if err != nil {
+		err = v.correct500Error(err)
 		return nil, err
 	}
 
@@ -65,6 +62,7 @@ func (v *Client) CurrentRekey() (*Rekey, error) {
 	var state RekeyState
 	err := v.doSysRequest("GET", "/sys/rekey/init", nil, &state)
 	if err != nil {
+		err = v.correct500Error(err)
 		return nil, err
 	}
 
@@ -78,18 +76,39 @@ func (v *Client) CurrentRekey() (*Rekey, error) {
 	}, nil
 }
 
+//This is here because in Vault 0.10.3, a regression was introduced that causes
+// rekey operations against an uninitialized or sealed Vault to return a 500
+// instead of a 503
+func (v *Client) correct500Error(err error) error {
+	//Thanks, Vault 0.10.3
+	if _, is500 := err.(*ErrInternalServer); is500 {
+		tmpErr := v.Health(true)
+		if _, isUninitialized := tmpErr.(*ErrUninitialized); isUninitialized {
+			err = tmpErr
+		} else if _, isSealed := tmpErr.(*ErrSealed); isSealed {
+			err = tmpErr
+		}
+	}
+
+	return err
+}
+
 func (v *Client) rekeyStart(conf RekeyConfig) error {
 	return v.doSysRequest("PUT", "/sys/rekey/init", &conf, nil)
 }
 
 //Cancel tells Vault to forget about the current rekey operation
 func (r *Rekey) Cancel() error {
-	return r.client.rekeyCancel()
+	return r.client.RekeyCancel()
 }
 
-func (v *Client) rekeyCancel() error {
+//RekeyCancel tells Vault to forget about the current rekey operation
+func (v *Client) RekeyCancel() error {
 	return v.doSysRequest("DELETE", "/sys/rekey/init", nil, nil)
 }
+
+//Before 0.10, it was "no rekey in progress". In 0.10, the word barrier was added
+var rekeyRegexp = regexp.MustCompile("no (barrier )?rekey in progress")
 
 //Submit gives keys to the rekey operation specified by this *Rekey object. Any
 //keys beyond the current required amount are ignored. If the Rekey is
@@ -99,7 +118,8 @@ func (v *Client) rekeyCancel() error {
 //cancelled, but is instead reset. No error is given for an incorrect key
 //before the threshold is reached. An *ErrBadRequest may also be returned if
 //there is no longer any rekey in progress, but in this case, done will be
-//returned as true.
+//returned as true. To retrieve the new keys after submitting enough existing
+//keys, call Keys() on the Rekey object.
 func (r *Rekey) Submit(keys ...string) (done bool, err error) {
 	for _, key := range keys {
 		var result interface{}
@@ -109,8 +129,9 @@ func (r *Rekey) Submit(keys ...string) (done bool, err error) {
 				r.state.Progress = 0
 				//I really hate error string checking, but there's no good way that doesn't
 				//require another API call (which could, in turn, err, and leave us in a
-				//wrong state)
-				if strings.Contains(ebr.message, "no rekey in progress") {
+				//wrong state). This checks if the rekey operation is no longer in
+				//progress
+				if rekeyRegexp.MatchString(ebr.message) {
 					done = true
 				}
 			}
@@ -140,6 +161,15 @@ type rekeyKeys struct {
 }
 
 func (v *Client) rekeySubmit(key string, nonce string) (ret interface{}, err error) {
+	if key == "" {
+		err = fmt.Errorf("no key provided")
+		return
+	}
+	if nonce == "" {
+		err = fmt.Errorf("no nonce provided")
+		return
+	}
+
 	tempMap := make(map[string]interface{})
 	err = v.doSysRequest(
 		"PUT",

@@ -31,6 +31,8 @@ type vaultResponse struct {
 	//There's totally more to the response, but this is all I care about atm.
 }
 
+//URL encoded values can be given as a *url.Values as "input" when performing
+// a GET call
 func (v *Client) doRequest(
 	method, path string,
 	input interface{},
@@ -42,11 +44,12 @@ func (v *Client) doRequest(
 		u.Host = fmt.Sprintf("%s:8200", u.Host)
 	}
 
+	var query url.Values
 	var body io.Reader
 	if input != nil {
 		if strings.ToUpper(method) == "GET" {
 			//Input has to be a url.Values
-			u.RawQuery = input.(url.Values).Encode()
+			query = input.(url.Values)
 		} else {
 			body = &bytes.Buffer{}
 			err := json.NewEncoder(body.(*bytes.Buffer)).Encode(input)
@@ -56,9 +59,39 @@ func (v *Client) doRequest(
 		}
 	}
 
-	req, err := http.NewRequest(method, u.String(), body)
+	resp, err := v.Curl(method, path, query, body)
 	if err != nil {
 		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode/100 != 2 {
+		return v.parseError(resp)
+	}
+
+	if output != nil && resp.StatusCode == 200 {
+		err = json.NewDecoder(resp.Body).Decode(output)
+	}
+
+	return err
+}
+
+//Curl takes the given path, prepends <VaultURL>/v1/ to it, and makes the request
+// with the remainder of the given parameters. Errors returned only reflect
+// transport errors, not HTTP semantic errors
+func (v *Client) Curl(method string, path string, urlQuery url.Values, body io.Reader) (*http.Response, error) {
+	//Setup URL
+	u := *v.VaultURL
+	u.Path = fmt.Sprintf("/v1/%s", strings.Trim(path, "/"))
+	if u.Port() == "" {
+		u.Host = fmt.Sprintf("%s:8200", u.Host)
+	}
+	u.RawQuery = urlQuery.Encode()
+
+	//Do the request
+	req, err := http.NewRequest(method, u.String(), body)
+	if err != nil {
+		return nil, err
 	}
 	if v.Trace != nil {
 		dump, _ := httputil.DumpRequest(req, true)
@@ -69,35 +102,32 @@ func (v *Client) doRequest(
 	if token == "" {
 		token = "01234567-89ab-cdef-0123-456789abcdef"
 	}
-	req.Header.Add("X-Vault-Token", token)
+	req.Header.Set("X-Vault-Token", token)
 
 	client := v.Client
 	if client == nil {
 		client = http.DefaultClient
 	}
 
+	if client.CheckRedirect == nil {
+		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+			if len(via) > 10 {
+				return fmt.Errorf("Stopped after 10 redirects")
+			}
+			req.Header.Set("X-Vault-Token", token)
+			return nil
+		}
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
-		return &ErrTransport{message: err.Error()}
+		return nil, &ErrTransport{message: err.Error()}
 	}
-	defer resp.Body.Close()
 
 	if v.Trace != nil {
 		dump, _ := httputil.DumpResponse(resp, true)
 		v.Trace.Write([]byte(fmt.Sprintf("Response:\n%s\n", dump)))
 	}
 
-	if resp.StatusCode/100 != 2 {
-		err = v.parseError(resp)
-		if err != nil {
-			return err
-		}
-	}
-
-	//If the status code is 204, there is no body. That leaves only 200.
-	if output != nil && resp.StatusCode == 200 {
-		err = json.NewDecoder(resp.Body).Decode(&output)
-	}
-
-	return err
+	return resp, nil
 }

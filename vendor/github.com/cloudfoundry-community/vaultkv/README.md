@@ -43,9 +43,4 @@ func main() {
 
 ## Testing
 
-There are Ginkgo tests. These tests will run the suite against multiple
-versions of Vault. This can be cumbersome for general development, because
-the tests can take awhile to run (each spec restarts an external Vault
-process). If you only want to test against the latest version of Vault, set
-the environment variable `VAULTKV_TEST_ONLY_LATEST`. Please test without this
-variable set before submitting any PRs.
+Run `./test` in the base directory to test all supported Vault versions. Run `./test latest` to test only the latest supported version of Vault.

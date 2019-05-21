@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -19,11 +20,14 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/cloudfoundry-community/vaultkv"
 	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
 )
 
@@ -36,31 +40,66 @@ func TestVaultkv(t *testing.T) {
 
 	AfterEach(StopVault)
 	RegisterFailHandler(Fail)
-	for i, version := range vaultVersions {
-		currentVaultVersion = version
-		RunSpecs(t, fmt.Sprintf("Vaultkv - Vault Version %s", currentVaultVersion))
-		if i != len(vaultVersions)-1 {
-			fmt.Println("")
-			fmt.Println("")
-			fmt.Println("========================================================")
-			fmt.Println(`|/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\|`)
-			fmt.Println("========================================================")
-			fmt.Println("")
-		}
+
+	if currentVaultVersion == "" {
+		panic("Must specify vault version")
 	}
+
+	RunSpecs(t, fmt.Sprintf("Vaultkv - Vault Version %s", currentVaultVersion))
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Println("========================================================")
+	fmt.Println(`|/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\|`)
+	fmt.Println("========================================================")
+	fmt.Println("")
 }
 
 func init() {
-	vaultVersions = []string{
-		"0.6.5",
-		"0.7.3",
-		"0.8.3",
-		"0.9.6",
+	flag.StringVar(&currentVaultVersion, "v", "", "version specifies the vault version to test")
+}
+
+type semver struct {
+	major, minor, patch uint
+}
+
+func parseSemver(s string) semver {
+	sections := strings.Split(s, ".")
+	if len(sections) != 3 {
+		panic(fmt.Sprintf("You didn't give me a real semver: %s", s))
 	}
 
-	if os.Getenv("VAULTKV_TEST_ONLY_LATEST") != "" {
-		vaultVersions = vaultVersions[len(vaultVersions)-1:]
+	sectionsInt := [3]uint64{}
+	for i, section := range sections {
+		sectionsInt[i], err = strconv.ParseUint(section, 10, 64)
+		if err != nil {
+			panic("Semver section was not parseable as a uint")
+		}
 	}
+
+	return semver{
+		major: uint(sectionsInt[0]),
+		minor: uint(sectionsInt[1]),
+		patch: uint(sectionsInt[2]),
+	}
+}
+
+func (s1 semver) LessThan(s2 semver) bool {
+	if s1.major < s2.major {
+		return true
+	}
+	if s1.major > s2.major {
+		return false
+	}
+
+	if s1.minor < s2.minor {
+		return true
+	}
+
+	if s1.minor > s2.minor {
+		return false
+	}
+
+	return s1.patch < s2.patch
 }
 
 //The current vault client used by each spec
@@ -169,9 +208,23 @@ func downloadVault(version string) error {
 	return nil
 }
 
-var _ = BeforeSuite(func() {
+var _ = SynchronizedBeforeSuite(func() []byte {
+	_, err = os.Stat(buildVaultPath(currentVaultVersion))
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = downloadVault(currentVaultVersion)
+			if err != nil {
+				panic(fmt.Sprintf("Could not download vault: %s", err))
+			}
+		} else {
+			panic(fmt.Sprintf("Could not stat Vault path `%s': %s", buildVaultPath(currentVaultVersion), err.Error()))
+		}
+	}
+
+	return []byte(buildVaultPath(currentVaultVersion))
+}, func(vaultPath []byte) {
 	var err error
-	const uriStr = "https://127.0.0.1:8201"
+	var uriStr = fmt.Sprintf("https://127.0.0.1:%d", 8202+(config.GinkgoConfig.ParallelNode*2))
 	vaultURI, err = url.Parse(uriStr)
 	if err != nil {
 		panic(fmt.Sprintf("Could not parse Vault URI: %s", uriStr))
@@ -245,10 +298,12 @@ listener "tcp" {
 }
 `, vaultURI.Host, certLocation, keyLocation)
 	_, err = configFile.WriteString(vaultConfig)
+
 	if err != nil {
 		panic(fmt.Sprintf("Could not write test config to file: %s", err))
 	}
 
+	configFile.Close()
 })
 
 var _ = AfterSuite(func() {
@@ -277,14 +332,7 @@ func StartVault(version string) {
 	var err error
 	_, err = os.Stat(buildVaultPath(version))
 	if err != nil {
-		if !os.IsNotExist(err) {
-			panic(fmt.Sprintf("Could not lookup Vault path `%s': %s", buildVaultPath(version), err.Error()))
-		}
-
-		err = downloadVault(version)
-		if err != nil {
-			panic(fmt.Sprintf("When downloading Vault version `%s': %s", version, err.Error()))
-		}
+		panic(fmt.Sprintf("Could not stat Vault path `%s': %s", buildVaultPath(version), err.Error()))
 	}
 
 	//Gotta get that IPC from Vault in case we want to report errors
@@ -369,7 +417,6 @@ func StopVault() {
 	_ = <-processChan
 	processOutputWriter.Close()
 	processOutputReader.Close()
-
 	currentVaultProcess = nil
 }
 
@@ -387,15 +434,27 @@ func NewTestClient() *vaultkv.Client {
 	}
 }
 
-func AssertNoError() func() {
-	return func() {
-		Expect(err).NotTo(HaveOccurred())
-	}
-}
-
 func AssertErrorOfType(t interface{}) func() {
 	return func() {
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(BeAssignableToTypeOf(t))
 	}
+}
+
+func InitAndUnsealVault() {
+	var initOut *vaultkv.InitVaultOutput
+	initOut, err = vault.InitVault(vaultkv.InitConfig{
+		Shares:    1,
+		Threshold: 1,
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	_, err = vault.Unseal(initOut.Keys[0])
+	Expect(err).NotTo(HaveOccurred())
+
+	err = vault.DisableSecretsMount("secret")
+	Expect(err).NotTo(HaveOccurred())
+
+	err = vault.EnableSecretsMount("secret", vaultkv.Mount{Type: "kv"})
+	Expect(err).NotTo(HaveOccurred())
 }

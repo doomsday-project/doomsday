@@ -21,10 +21,10 @@
 			"revisionTime": "2015-10-22T06:55:26Z"
 		},
 		{
-			"checksumSHA1": "miWIA09L2UolqhOZiYo8liQxZmM=",
+			"checksumSHA1": "9IY/+XS/ETTqHBDFRt4iqtySSDo=",
 			"path": "github.com/cloudfoundry-community/vaultkv",
-			"revision": "acdcc5e29d4703bb1b20548f3cb26b70773fb19e",
-			"revisionTime": "2018-04-10T15:24:34Z"
+			"revision": "0ed39daafa01eaa5f526c6bc2581e80896e9674f",
+			"revisionTime": "2019-04-18T21:12:05Z"
 		},
 		{
 			"checksumSHA1": "PM+dS3SGHWrjdQsPtbdnvanfgC8=",

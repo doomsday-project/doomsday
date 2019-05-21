@@ -12,7 +12,7 @@ import (
 )
 
 type VaultAccessor struct {
-	client   *vaultkv.Client
+	client   *vaultkv.KV
 	basePath string
 }
 
@@ -44,7 +44,7 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 	}
 
 	return &VaultAccessor{
-		client: &vaultkv.Client{
+		client: (&vaultkv.Client{
 			VaultURL:  u,
 			AuthToken: conf.Auth.Token,
 			Client: &http.Client{
@@ -55,7 +55,7 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 				},
 			},
 			//Trace: os.Stdout,
-		},
+		}).NewKV(),
 		basePath: conf.BasePath,
 	}, nil
 
@@ -65,7 +65,7 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 // return it as a map.
 func (v *VaultAccessor) Get(path string) (map[string]string, error) {
 	ret := make(map[string]string)
-	err := v.client.Get(path, &ret)
+	_, err := v.client.Get(path, &ret, nil)
 	return ret, err
 }
 

@@ -42,7 +42,7 @@ var _ = Describe("Rekey", func() {
 				Shares:    initShares,
 				Threshold: initThreshold,
 			})
-			AssertNoError()()
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		When("Vault is sealed", func() {
@@ -69,7 +69,7 @@ var _ = Describe("Rekey", func() {
 		When("Vault is unsealed", func() {
 			JustBeforeEach(func() {
 				err = initOutput.Unseal()
-				AssertNoError()()
+				Expect(err).NotTo(HaveOccurred())
 			})
 
 			Describe("CurrentRekey with no rekey in progress", func() {
@@ -107,51 +107,57 @@ var _ = Describe("Rekey", func() {
 							rekeyConf.Threshold = 1
 						})
 
-						It("should start a rekey with no error", AssertNoError())
-						Specify("remaining should report one", AssertRemaining(1))
+						It("should rekey properly", func() {
+							By("initializing the rekey without erroring")
+							Expect(err).NotTo(HaveOccurred())
 
-						Describe("State", func() {
-							var state vaultkv.RekeyState
-							JustBeforeEach(func() {
-								state = rekey.State()
-								Expect(state).NotTo(BeNil())
-							})
+							By("having remaining report one")
+							AssertRemaining(1)()
 
-							It("should have PendingShares as one", func() { Expect(state.PendingShares).To(Equal(1)) })
-							It("should have PendingThreshold as one", func() { Expect(state.PendingThreshold).To(Equal(1)) })
-							It("should have Required as one", func() { Expect(state.Required).To(Equal(1)) })
-							It("should have Progress as zero", func() { Expect(state.Progress).To(Equal(0)) })
-						})
+							By("having State not return nil")
+							state := rekey.State()
 
-						Describe("Submitting one key", func() {
+							//State with zero keys submitted
+							By("having the state say PendingShares is one")
+							Expect(state.PendingShares).To(Equal(1))
+
+							By("having the state say PendingThreshold is one")
+							Expect(state.PendingThreshold).To(Equal(1))
+
+							By("having the state say Required is one")
+							Expect(state.Required).To(Equal(1))
+
+							By("having the state say Progress is zero")
+							Expect(state.Progress).To(Equal(0))
+
 							var rekeyDone bool
+							rekeyDone, err = rekey.Submit(initOutput.Keys[0])
+							By("having the first key submission not err")
+							Expect(err).NotTo(HaveOccurred())
 
-							JustBeforeEach(func() {
-								rekeyDone, err = rekey.Submit(initOutput.Keys[0])
-							})
+							By("having the first key submission finish the rekey")
+							Expect(rekeyDone).To(BeTrue())
 
-							It("should not have returned an error", AssertNoError())
-							It("should say that the rekey is done", func() { Expect(rekeyDone).To(BeTrue()) })
+							By("having Keys have one new key")
+							Expect(rekey.Keys()).To(HaveLen(1))
 
-							Describe("Keys", func() {
-								var rekeyKeys []string
-								JustBeforeEach(func() {
-									rekeyKeys = rekey.Keys()
-								})
-
-								It("should have one key", func() { Expect(rekeyKeys).To(HaveLen(1)) })
-								Specify("Remaining should return zero", AssertRemaining(0))
-							})
+							By("having Remaining return zero")
+							AssertRemaining(0)()
 						})
 
-						Describe("Submitting too many keys", func() {
+						Describe("Submitting too many keys all at once", func() {
 							var rekeyDone bool
 							JustBeforeEach(func() {
 								rekeyDone, err = rekey.Submit(initOutput.Keys[0], "a", "b", "c")
 							})
 
-							It("should not have returned an error", AssertNoError())
-							It("should say that the rekey is done", func() { Expect(rekeyDone).To(BeTrue()) })
+							It("should properly unseal the vault (as long as the first keys are correct)", func() {
+								By("not erroring")
+								Expect(err).NotTo(HaveOccurred())
+
+								By("saying that the rekey is done")
+								Expect(rekeyDone).To(BeTrue())
+							})
 						})
 
 						Describe("Submitting an incorrect key", func() {
@@ -161,8 +167,13 @@ var _ = Describe("Rekey", func() {
 								rekeyDone, err = rekey.Submit("k8vk0IdoDeNAJl5JDJ282eehqIbRLv5WWoBy6ppBK9c=")
 							})
 
-							It("should return ErrBadRequest", AssertErrorOfType(&vaultkv.ErrBadRequest{}))
-							It("should not claim to be done", func() { Expect(rekeyDone).To(BeFalse()) })
+							It("should err properly", func() {
+								By("returning an ErrBadRequest")
+								AssertErrorOfType(&vaultkv.ErrBadRequest{})()
+
+								By("saying that it's not done")
+								Expect(rekeyDone).To(BeFalse())
+							})
 						})
 					})
 
@@ -188,46 +199,45 @@ var _ = Describe("Rekey", func() {
 							rekeyConf.Threshold = 1
 						})
 
-						It("should not return an error", AssertNoError())
-						Specify("Remaining should return three", AssertRemaining(3))
+						It("should allow rekey operations", func() {
+							By("not erroring from the creation of the rekey")
+							Expect(err).NotTo(HaveOccurred())
 
-						Describe("Submitting one key", func() {
+							By("having Remaining return three")
+							AssertRemaining(3)()
+
+							By("having the first key submission not err")
 							var rekeyDone bool
-							JustBeforeEach(func() {
-								rekeyDone, err = rekey.Submit(initOutput.Keys[0])
-							})
+							rekeyDone, err = rekey.Submit(initOutput.Keys[0])
+							Expect(err).NotTo(HaveOccurred())
 
-							It("should not return an error", AssertNoError())
-							It("should not consider the rekey done", func() { Expect(rekeyDone).To(BeFalse()) })
-							Specify("Remaining should say two", AssertRemaining(2))
+							By("not claiming to be done with the rekey")
+							Expect(rekeyDone).To(BeFalse())
 
-							Describe("Getting the existing rekey operation with CurrentRekey", func() {
-								JustBeforeEach(func() {
-									rekey, err = vault.CurrentRekey()
-								})
+							By("having Remaining return two")
+							AssertRemaining(2)()
 
-								It("should not return an error", AssertNoError())
-								It("should return a non-nil rekey", func() { Expect(rekey).NotTo(BeNil()) })
-								Specify("The rekey object should specify two keys remaining", AssertRemaining(2))
-							})
+							By("getting the current rekey operation not erroring")
+							rekey, err = vault.CurrentRekey()
+							Expect(err).NotTo(HaveOccurred())
 
-							Describe("Cancelling the rekey", func() {
-								JustBeforeEach(func() {
-									err = rekey.Cancel()
-								})
+							By("the CurrentRekey operation not returning nil")
+							Expect(rekey).NotTo(BeNil())
 
-								It("should not return an error", AssertNoError())
+							By("the CurrentRekey return value's Remaining should return two")
+							AssertRemaining(2)
 
-								Describe("Submitting after the cancellation", func() {
-									var rekeyDone bool
-									JustBeforeEach(func() {
-										rekeyDone, err = rekey.Submit(initOutput.Keys[0])
-									})
+							By("cancelling the rekey not returning an error")
+							err = rekey.Cancel()
+							Expect(err).NotTo(HaveOccurred())
 
-									It("should report being done", func() { Expect(rekeyDone).To(BeTrue()) })
-									It("should return an ErrBadRequest", AssertErrorOfType(&vaultkv.ErrBadRequest{}))
-								})
-							})
+							By("submitting after the rekey was cancelled returning an ErrBadRequest")
+							rekeyDone, err = rekey.Submit(initOutput.Keys[0])
+							AssertErrorOfType(&vaultkv.ErrBadRequest{})()
+
+							By("the submission after the rekey was cancelled returning that the rekey is done")
+							Expect(rekeyDone).To(BeTrue())
+
 						})
 
 						Describe("Submitting all necessary keys", func() {
@@ -237,10 +247,18 @@ var _ = Describe("Rekey", func() {
 									rekeyDone, err = rekey.Submit(initOutput.Keys...)
 								})
 
-								It("should not return an error", AssertNoError())
-								It("should consider the rekey done", func() { Expect(rekeyDone).To(BeTrue()) })
-								Specify("remaining should return 0", AssertRemaining(0))
-								Specify("Keys should return 1 key", AssertHasKeys(1))
+								It("should rekey the vault successfully", func() {
+									By("not erroring")
+									Expect(err).NotTo(HaveOccurred())
+
+									By("claiming that the rekey is done")
+									Expect(rekeyDone).To(BeTrue())
+
+									By("having Remaining return 0")
+
+									By("Keys returning the 1 new key")
+									AssertHasKeys(1)()
+								})
 							})
 
 							Context("One Submit call at a time", func() {
@@ -248,13 +266,20 @@ var _ = Describe("Rekey", func() {
 								JustBeforeEach(func() {
 									for _, key := range initOutput.Keys {
 										rekeyDone, err = rekey.Submit(key)
-										AssertNoError()
+										Expect(err).NotTo(HaveOccurred())
 									}
 								})
 
-								It("should consider the rekey done", func() { Expect(rekeyDone).To(BeTrue()) })
-								Specify("remaining should return 0", AssertRemaining(0))
-								Specify("Keys should return 1 key", AssertHasKeys(1))
+								It("should rekey successfully", func() {
+									By("returning that the rekey is done")
+									Expect(rekeyDone).To(BeTrue())
+
+									By("having Remaining return zero")
+									AssertRemaining(0)()
+
+									By("having Keys return the one new key")
+									AssertHasKeys(1)()
+								})
 							})
 						})
 					})
