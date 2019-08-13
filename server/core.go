@@ -6,9 +6,12 @@ import (
 	"encoding/pem"
 	"fmt"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/doomsday-project/doomsday/storage"
+	yaml "gopkg.in/yaml.v2"
 )
 
 type Core struct {
@@ -51,6 +54,11 @@ func (b *Core) Populate() (*PopulateStats, error) {
 	return results, nil
 }
 
+type x509CertWrapper struct {
+	path string
+	cert *x509.Certificate
+}
+
 func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateStats, error) {
 	if cache == nil {
 		panic("Was given a nil cache")
@@ -86,17 +94,25 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateSta
 			}
 
 			for k, v := range secret {
-				certs := parseCert(v)
+				certs := wrapCerts(parseCert(v), k)
+				if len(certs) == 0 {
+					keys, err := parseYAMLKeys(v)
+					if err == nil {
+						for _, str := range keys {
+							certs = append(certs, wrapCerts(parseCert(str.Value), k+":"+str.Path)...)
+						}
+					}
+				}
 				for _, cert := range certs {
 					myCertCount++
 					cache.Merge(
-						fmt.Sprintf("%s", sha1.Sum(cert.Raw)),
+						fmt.Sprintf("%s", sha1.Sum(cert.cert.Raw)),
 						CacheObject{
-							Subject:  cert.Subject,
-							NotAfter: cert.NotAfter,
+							Subject:  cert.cert.Subject,
+							NotAfter: cert.cert.NotAfter,
 							Paths: []PathObject{
 								{
-									Location: path + ":" + k,
+									Location: cert.path,
 									Source:   b.Name,
 								},
 							},
@@ -154,4 +170,73 @@ func parseCert(c string) []*x509.Certificate {
 	}
 
 	return certs
+}
+
+func wrapCerts(certs []*x509.Certificate, path string) (ret []x509CertWrapper) {
+	for _, c := range certs {
+		ret = append(ret, x509CertWrapper{
+			path: path,
+			cert: c,
+		})
+	}
+
+	return ret
+}
+
+type YAMLKey struct {
+	Path  string
+	Value string
+}
+
+func parseYAMLKeys(y string) ([]YAMLKey, error) {
+	var output interface{}
+	err := yaml.Unmarshal([]byte(y), &output)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := recurseTree(output, nil)
+
+	return ret, nil
+}
+
+func recurseTree(obj interface{}, curPath []string) (ret []YAMLKey) {
+	switch t := obj.(type) {
+	case string:
+		ret = append(ret, YAMLKey{
+			Path:  treePath(curPath),
+			Value: t,
+		})
+	case map[interface{}]interface{}:
+		for k, v := range t {
+			var kAsString string
+			switch t2 := k.(type) {
+			case string:
+				kAsString = t2
+			case int:
+				kAsString = strconv.Itoa(t2)
+			case bool:
+				if t2 {
+					kAsString = "true"
+				} else {
+					kAsString = "false"
+				}
+			}
+			ret = append(ret, recurseTree(v, append(curPath, kAsString))...)
+		}
+	case []interface{}:
+		for i, v := range t {
+			ret = append(ret, recurseTree(v, append(curPath, strconv.Itoa(i)))...)
+		}
+	}
+
+	return ret
+}
+
+func treePath(path []string) string {
+	if len(path) == 0 {
+		return "(root)"
+	}
+
+	return strings.Join(path, ".")
 }
