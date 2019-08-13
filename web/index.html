@@ -202,6 +202,7 @@
 				lens.include("cert-list", v);
 			});
 		]]
+		<div class="show-more">show more</div>
 	</script>
 
 	<script>
@@ -267,7 +268,7 @@
 
 						for (var i = 0; i < data.content.length; i++) {
 							var cert = data.content[i];
-							if (cert.not_after - now > 7776000) {
+							if (!shouldShowMoreCerts && cert.not_after - now > 7776000) {
 								break;
 							}
 
@@ -292,7 +293,9 @@
 
 						$("#certs").template("cert-list-group", {lists: lists});
 						$("#certs").show();
-			      certUpdateID = setTimeout(updateCertList, 60 * 1000);
+						if (certUpdateID == NO_CERT_UDPATE_ID) {
+							certUpdateID = setTimeout(updateCertList, 60 * 1000);
+						}
 					},
 					400: function(data) {gotoLogin("Bad request");},
 					401: function(data) {deleteCookie('doomsday-token'); gotoLogin("Your session has expired");},
@@ -342,7 +345,8 @@
 			}
 		});
 
-		certUpdateID = -1;
+		NO_CERT_UPDATE_ID = -1;
+		certUpdateID = NO_CERT_UPDATE_ID;
 
 		function handleLogin(e) {
 			var username = $('input[name=username]').val();
@@ -373,7 +377,7 @@
 
 		function gotoLogin(message) {
 			clearTimeout(certUpdateID);
-			certUpdateID = -1;
+			certUpdateID = NO_CERT_UPDATE_ID;
 			$("#certs").hide();
 			$("#hamburger-box").hide();
 
@@ -388,10 +392,19 @@
 			$("#login").show();
 		}
 
+		shouldShowMoreCerts = false;
+		
 		function gotoDashboard() {
+			shouldShowMoreCerts = false;
+			$('.show-more').show();
 			$("#login").hide();
 			$("#login-form").off("submit");
 			$('#hamburger-box').show();
+			$('.show-more').click(function() {
+				shouldShowMoreCerts = true;
+				$('.show-more').hide();
+				updateCertList();
+			})
 
 			updateCertList();
 		}
