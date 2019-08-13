@@ -79,7 +79,7 @@ func ParseConfig(path string) (*Config, error) {
 	}
 
 	//Validation
-	if conf.Server.Port < 0 || conf.Server.Port > 65535 {
+	if conf.Server.Port > 65535 {
 		return nil, fmt.Errorf("Port number is invalid")
 	}
 
