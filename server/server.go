@@ -20,10 +20,12 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var log *logger.Logger
+
 func Start(conf Config) error {
 	var err error
 
-	log := logger.NewLogger(os.Stderr)
+	log = logger.NewLogger(os.Stderr)
 	if conf.Server.LogFile != "" {
 		var logTarget *os.File
 		logTarget, err = os.OpenFile(conf.Server.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -146,7 +148,7 @@ func getInfo(authType auth.AuthType) func(w http.ResponseWriter, r *http.Request
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(b)
+		writeBody(w, b)
 	}
 }
 
@@ -161,7 +163,7 @@ func getCache(manager *SourceManager) func(w http.ResponseWriter, r *http.Reques
 		} else {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(200)
-			w.Write(resp)
+			writeBody(w, resp)
 		}
 	}
 }
@@ -177,7 +179,7 @@ func serveFile(content, mimeType string) func(w http.ResponseWriter, r *http.Req
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", mimeType)
 		w.WriteHeader(200)
-		w.Write([]byte(content))
+		writeBody(w, []byte(content))
 	}
 }
 
@@ -186,14 +188,14 @@ func serveDevFile(filepath string) func(w http.ResponseWriter, r *http.Request) 
 		f, err := os.Open(filepath)
 		if err != nil {
 			w.WriteHeader(500)
-			w.Write([]byte(fmt.Sprintf("Could not serve file: %s", filepath)))
+			writeBody(w, []byte(fmt.Sprintf("Could not serve file: %s", filepath)))
 			return
 		}
 
 		contents, err := ioutil.ReadAll(f)
 		if err != nil {
 			w.WriteHeader(500)
-			w.Write([]byte("Could not read contents of file"))
+			writeBody(w, []byte("Could not read contents of file"))
 			return
 		}
 
@@ -211,7 +213,14 @@ func serveDevFile(filepath string) func(w http.ResponseWriter, r *http.Request) 
 		w.Header().Set("Content-Type", contentType)
 
 		w.WriteHeader(200)
-		w.Write(contents)
+		writeBody(w, contents)
 		f.Close()
+	}
+}
+
+func writeBody(w http.ResponseWriter, contents []byte) {
+	_, err := w.Write(contents)
+	if err != nil {
+		log.WriteF("%s", err.Error())
 	}
 }
