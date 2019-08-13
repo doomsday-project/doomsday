@@ -187,12 +187,14 @@ func serveDevFile(filepath string) func(w http.ResponseWriter, r *http.Request) 
 		if err != nil {
 			w.WriteHeader(500)
 			w.Write([]byte(fmt.Sprintf("Could not serve file: %s", filepath)))
+			return
 		}
 
 		contents, err := ioutil.ReadAll(f)
 		if err != nil {
 			w.WriteHeader(500)
 			w.Write([]byte("Could not read contents of file"))
+			return
 		}
 
 		contentType := "text/plain"
