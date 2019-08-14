@@ -285,6 +285,8 @@
 							}
 						}
 
+						console.log(lists.length)
+
 						if (lists.length == 0) {
 							$("#certs").template("no-certs-page");
 							return;
@@ -391,6 +393,7 @@
 		function gotoDashboard() {
 			$("#login").hide();
 			$("#login-form").off("submit");
+			$("#certs").show();
 			$('#hamburger-box').show();
 
 			updateCertList();
