@@ -112,7 +112,7 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateSta
 							NotAfter: cert.cert.NotAfter,
 							Paths: []PathObject{
 								{
-									Location: cert.path,
+									Location: path + ":" + cert.path,
 									Source:   b.Name,
 								},
 							},
