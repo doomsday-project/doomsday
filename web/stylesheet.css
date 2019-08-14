@@ -127,13 +127,14 @@
   color: white;
 	font-size: 40;
 	position: relative;
-	top: -2px;
+	top: -4px;
 	-webkit-touch-callout: none;
   -webkit-user-select: none;
   -khtml-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+  font-family: 'Walter Turncoat', 'Pangolin', 'Verdana';
 }
 
 #hamburger {
@@ -248,7 +249,7 @@ body {
 }
 
 div {
-	font-family: "Walter Turncoat", "Verdana";
+	font-family: "Pangolin", "Walter Turncoat", "Verdana";
 	color: rgba(0,0,0,.8);
 }
 

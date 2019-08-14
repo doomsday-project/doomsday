@@ -4,9 +4,19 @@ web/index.html:
 web/stylesheet.css: 
   servePath: /web/assets/stylesheet.css
   mimeType: text/css
+web/fonts.css:
+  servePath: /web/assets/fonts.css
+  mimeType: text/css
 web/include/lens.js:
   servePath: /web/assets/lens.js
   mimeType: application/javascript
 web/include/jquery-3.4.0.min.js:
   servePath: /web/assets/jquery-3.4.0.min.js
   mimeType: application/javascript
+web/fonts/Pangolin/Pangolin-Regular.ttf:
+  servePath: /web/assets/fonts/Pangolin.ttf
+  mimeType: font/opentype
+web/fonts/Walter_Turncoat/WalterTurncoat-Regular.ttf:
+  servePath: /web/assets/fonts/WalterTurncoat.ttf
+  mimeType: font/opentype
+

@@ -175,11 +175,11 @@ func refreshCache(manager *SourceManager) func(w http.ResponseWriter, r *http.Re
 	}
 }
 
-func serveFile(content, mimeType string) func(w http.ResponseWriter, r *http.Request) {
+func serveFile(content []byte, mimeType string) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", mimeType)
 		w.WriteHeader(200)
-		writeBody(w, []byte(content))
+		writeBody(w, content)
 	}
 }
 
@@ -208,6 +208,8 @@ func serveDevFile(filepath string) func(w http.ResponseWriter, r *http.Request) 
 			contentType = "application/javascript"
 		} else if strings.HasSuffix(filepath, ".svg") {
 			contentType = "image/svg+xml"
+		} else if strings.HasSuffix(filepath, ".woff2") {
+			contentType = "font/opentype"
 		}
 
 		w.Header().Set("Content-Type", contentType)
