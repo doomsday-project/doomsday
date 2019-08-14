@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -77,6 +78,9 @@ func main() {
 			Content:  fileContentsFiltered,
 		})
 	}
+
+	//Make sure the static files get written in a determinstic order
+	sort.Slice(staticFiles, func(i, j int) bool { return staticFiles[i].Path < staticFiles[j].Path })
 
 	t := template.Must(template.New("genstaticmap").Parse(tmpl))
 
