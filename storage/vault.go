@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/cloudfoundry-community/vaultkv"
@@ -52,6 +53,7 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 					TLSClientConfig: &tls.Config{
 						InsecureSkipVerify: conf.InsecureSkipVerify,
 					},
+					MaxIdleConnsPerHost: runtime.NumCPU(),
 				},
 			},
 			//Trace: os.Stdout,
