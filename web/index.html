@@ -204,7 +204,9 @@
 		]]
 	</script>
 
-	<script>
+	<script type="application/javascript" src="web/assets/js/client.js"></script>
+
+	<script type="application/javascript">
 		function durationString(days) {
 			if (days < 0) {
 				return "THE DAWN OF TIME";
@@ -255,68 +257,54 @@
 		}
 
 		function updateCertList() {
-			$.ajax({
-				method: "GET",
-				url: "/v1/cache",
-				dataType: "json",
-				statusCode: {
-					200: function(data) {
-						var now = new Date().getTime()/1000;
+			doomsday.fetchCerts()
+			.then(content => {
+				var now = new Date().getTime()/1000;
 
-						var lists = [];
+				var lists = [];
 
-						for (var i = 0; i < data.content.length; i++) {
-							var cert = data.content[i];
-							if (cert.not_after - now > 7776000) {
-								break;
-							}
+				for (var i = 0; i < content.length; i++) {
+					var cert = content[i];
+					if (cert.not_after - now > 7776000) {
+						break;
+					}
 
-							if (lists.length == 0 || cert.not_after > lists[lists.length-1].cutoff) {
-								var maxDays = Math.max(0, Math.ceil((cert.not_after - now) / 86400));
-								var label = durationString(maxDays - 1);
-								lists.push({
-									header: label, 
-									cutoff: now + (maxDays * 86400),
-									color: cardColor(maxDays - 1),
-									certs: [cert]
-								});
-							} else {
-								lists[lists.length-1].certs.push(cert);
-							}
-						}
-
-						console.log(lists.length)
-
-						if (lists.length == 0) {
-							$("#certs").template("no-certs-page");
-							return;
-						}
-
-						$("#certs").template("cert-list-group", {lists: lists});
-						$("#certs").show();
-			      certUpdateID = setTimeout(updateCertList, 60 * 1000);
-					},
-					400: function(data) {gotoLogin("Bad request");},
-					401: function(data) {deleteCookie('doomsday-token'); gotoLogin("Your session has expired");},
-					500: function(data) {gotoLogin("Internal server error");}
+					if (lists.length == 0 || cert.not_after > lists[lists.length-1].cutoff) {
+						var maxDays = Math.max(0, Math.ceil((cert.not_after - now) / 86400));
+						var label = durationString(maxDays - 1);
+						lists.push({
+							header: label, 
+							cutoff: now + (maxDays * 86400),
+							color: cardColor(maxDays - 1),
+							certs: [cert]
+						});
+					} else {
+						lists[lists.length-1].certs.push(cert);
+					}
 				}
+
+				console.log(lists.length)
+
+				if (lists.length == 0) {
+					$("#certs").template("no-certs-page");
+					return;
+				}
+
+				$("#certs").template("cert-list-group", {lists: lists});
+				$("#certs").show();
+				certUpdateID = setTimeout(updateCertList, 60 * 1000);
 			})
+			.catch(e => {
+				if (e.getError() == "error" && e.getCode == 401) {
+					deleteCookie('doomsday-token');
+					gotoLogin("Your session has expired");
+				} else {
+					gotoLogin("Something went wrong!");
+				}
+			});
 		}
 
-
-		function getAuthType() {
-		  var authType = "None";
-			$.ajax({
-				async: false,
-				method: "GET",
-				url: "/v1/info",
-				dataType: "json",
-				success: function(data) {
-					authType = data.auth_type;
-				},
-			})
-			return authType;
-		}
+		var doomsday = new Doomsday();
 
 		$(document).ready(function(){
 			var hamburgerBox = $('#hamburger-box');
@@ -324,24 +312,27 @@
 		  NORMAL_HAMBURGER_HEIGHT = $('#hamburger').height();
 		  HAMBURGER_BOX_PADDING = hamburgerBox.innerWidth() - NORMAL_HAMBURGER_WIDTH;
 
-			var authType = getAuthType();
-			if (authType == "None") {
-				logout_button = $('#logout-button')
-				logout_button.addClass('hamburger-menu-button-inactive');
-				logout_button.removeClass('navbar-button hamburger-menu-button');
-				logout_button.mouseover(function() { logout_button.text('auth is turned off'); });
-				logout_button.mouseout(function() { logout_button.text('logout'); });
-			} else {
-				$('#logout-button').click(function() {
-					closeHamburgerMenu();
-					handleLogout();
-				})
-			}
-			if (authType == "Userpass" && getCookie('doomsday-token') == "") {
-				gotoLogin();
-			} else {
-			  gotoDashboard();
-			}
+			doomsday.fetchAuthType()
+			.then(authType => {
+				if (authType == AuthMethod.NONE) {
+					logout_button = $('#logout-button')
+					logout_button.addClass('hamburger-menu-button-inactive');
+					logout_button.removeClass('navbar-button hamburger-menu-button');
+					logout_button.mouseover(function() { logout_button.text('auth is turned off'); });
+					logout_button.mouseout(function() { logout_button.text('logout'); });
+				} else {
+					$('#logout-button').click(function() {
+						closeHamburgerMenu();
+						handleLogout();
+					})
+				}
+				if (authType == AuthMethod.USERPASS && getCookie('doomsday-token') == "") {
+					gotoLogin();
+				} else {
+					gotoDashboard();
+				}
+			})
+			.catch(() => {console.log("Something went wrong!");});
 		});
 
 		certUpdateID = -1;
@@ -349,22 +340,14 @@
 		function handleLogin(e) {
 			var username = $('input[name=username]').val();
 			var password = $('input[name=password]').val();
-			$.ajax({
-				method: "POST",
-				url: "/v1/auth",
-				contentType: "application/json",
-				dataType: "json",
-				data: JSON.stringify({username: username, password: password}),
-				statusCode: {
-					200: function() {
-						gotoDashboard();
-					},
-					400: function() {gotoLogin("Bad Request")},
-					401: function() {gotoLogin("The username and password did not match")},
-					404: function() {gotoLogin("Endpoint Not Found")},
-					500: function() {gotoLogin("Internal Server Error")}
+			doomsday.authUser(username, password)
+			.then(() => { gotoDashboard() })
+			.catch(e => {
+				if (e.getError() == "error" && e.getCode() == 401) { 
+					gotoLogin("The username and password did not match");
 				}
-			})
+				else { gotoLogin("Something went wrong!"); }
+			});
 			return false;
 		}
 

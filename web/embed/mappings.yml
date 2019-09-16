@@ -19,4 +19,6 @@ web/fonts/Pangolin/Pangolin-Regular.ttf:
 web/fonts/Walter_Turncoat/WalterTurncoat-Regular.ttf:
   servePath: /web/assets/fonts/WalterTurncoat.ttf
   mimeType: font/opentype
-
+web/js/client.js:
+  servePath: /web/assets/js/client.js
+  mimeType: application/javascript
