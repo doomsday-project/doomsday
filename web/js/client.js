@@ -8,13 +8,13 @@
 const AuthMethod = {
 	NONE: 0,
 	USERPASS: 1
-}
+};
 
 /**
  * Contains error information returned from an HTTP API call
  */
 function APIError(error, code) {
-	this._error = error
+	this._error = error;
 	this._code = code;
 
 	this.getError = () => this._error;
@@ -26,19 +26,19 @@ function APIError(error, code) {
  */
 function Doomsday() {
 	this._doRequest = (method, path, data) => {
-		let dataStr = undefined;
+		let dataStr;
 		if (data) { dataStr = JSON.stringify(data); }
 		return $.ajax({
 			method: method,
 			url: path,
 			dataType: "json",
 			data: dataStr
-		})
+		});
 	};
 
 	this._handleFailure = (jqXHR, textStatus) => {
 		throw new APIError(textStatus, jqXHR.status);
-	}
+	};
 
 	this.fetchAuthType = () => {
 		return this._doRequest("GET", "/v1/info")

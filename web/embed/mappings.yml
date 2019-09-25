@@ -22,3 +22,6 @@ web/fonts/Walter_Turncoat/WalterTurncoat-Regular.ttf:
 web/js/client.js:
   servePath: /web/assets/js/client.js
   mimeType: application/javascript
+web/js/main.js:
+  servePath: /web/assets/js/main.js
+  mimeType: application/javascript
