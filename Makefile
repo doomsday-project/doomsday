@@ -11,10 +11,12 @@ VERSION ?= development
 LDFLAGS := -X "github.com/doomsday-project/doomsday/version.Version=$(VERSION)-$(COMMIT_HASH)$(DIRTY)"
 BUILD := go build -v -ldflags='$(LDFLAGS)' -o $(OUTPUT_NAME) $(BUILD_TARGET)
 
-.PHONY: build darwin linux all clean embed
+.PHONY: build darwin linux all clean embed server
 .DEFAULT: build
 
-build: embed
+build: embed server
+
+server: 
 	@echo $(VERSION)-$(COMMIT_HASH)$(DIRTY)
 	GOOS=$(GOOS) GOARCH=amd64 $(BUILD)
 
