@@ -5,7 +5,7 @@ interface JQuery {
 	template(template: string, options?: object): any;
 }
 
-function durationString(days) {
+function durationString(days: number) {
 	if (days < 0) {
 		return "THE DAWN OF TIME";
 	} else if (days == 0) {
@@ -28,7 +28,7 @@ function durationString(days) {
 	}
 }
 
-function cardColor(days) {
+function cardColor(days: number) {
 	if (days < 0) {
 		return [0, 0, 0];
 	} else if (days < 3) {
@@ -46,7 +46,9 @@ function cardColor(days) {
 	return [40, 167, 69];
 }
 
-function colorShift(end, start, percent) {
+type Color = [number, number, number]
+
+function colorShift(end: Color, start: Color, percent: number) {
 	return [
 		start[0] + ((end[0] - start[0]) * percent),
 		start[1] + ((end[1] - start[1]) * percent),
@@ -183,94 +185,16 @@ function gotoDashboard() {
 	updateCertList();
 }
 
-let navbarMousedOver = false;
-let currentScrollNavTransparency = 0;
-
-function setNavbarTransparency(percentage) {
-	//Set the min opacity here as the fallback.
-	var navbarOpacity = 0.5;
-	var subtitleOpacity = 0;
-	var logoBoxBorderOpacity = 0.0;
-	var logoBoxBorderMaxOpacity = 0.3;
-
-	navbarOpacity = 1 - (navbarOpacity * percentage);
-	subtitleOpacity = 1 - (percentage);
-	logoBoxBorderOpacity = logoBoxBorderMaxOpacity - (logoBoxBorderMaxOpacity * (percentage));
-
-	$('#navbar').css("opacity", navbarOpacity);
-	$('#logo-box').css("border-right-color", "rgba(255, 255, 255, " + logoBoxBorderOpacity + ")");
-	$('#navbar .separator').css("opacity", subtitleOpacity);
-	$('#navbar #subtitle').css("opacity", subtitleOpacity);
-}
-
-$(window).scroll(function () {
-	var maxPixelDistance = 60;
-	currentScrollNavTransparency = Math.min(document.body.scrollTop / maxPixelDistance, 1);
-	if (!navbarMousedOver && !hamburgerMenuOpen) {
-		currentAnimNavTransparency = currentScrollNavTransparency;
-		setNavbarTransparency(currentScrollNavTransparency);
-	}
-});
-
 const FRAMERATE = 42;
 const FRAME_INTERVAL = 1000 / FRAMERATE;
 
 const NO_ANIM = -1;
-let navFadeAnimID = NO_ANIM;
-let currentAnimNavTransparency = currentScrollNavTransparency;
-
-function navbarFade(start, end) {
-	if (navFadeAnimID != NO_ANIM) {
-		clearInterval(navFadeAnimID);
-	}
-
-	var duration = 0.3; //in seconds
-	var totalDelta = end - start;
-	var lastAnimTime = new Date().getTime();
-	return function () {
-		var now = new Date().getTime();
-		var timeDelta = now - lastAnimTime;
-		var updatePercentage = (duration * 1000) / timeDelta;
-		var frameDelta = totalDelta / updatePercentage;
-		lastAnimTime = now;
-
-		currentAnimNavTransparency = currentAnimNavTransparency + frameDelta;
-		if (totalDelta > 0) {
-			var target = Math.min(currentScrollNavTransparency, end);
-			if (currentAnimNavTransparency >= target) {
-				currentAnimNavTransparency = target;
-				clearInterval(navFadeAnimID);
-				navFadeAnimID = NO_ANIM;
-			}
-		} else {
-			if (currentAnimNavTransparency <= end) {
-				currentAnimNavTransparency = end;
-				clearInterval(navFadeAnimID);
-				navFadeAnimID = NO_ANIM;
-			}
-		}
-
-		setNavbarTransparency(currentAnimNavTransparency);
-	};
-}
-
-$('#navbar').mouseover(function () {
-	navbarMousedOver = true;
-	navFadeAnimID = setInterval(navbarFade(1, 0), FRAME_INTERVAL);
-});
-
-$('#navbar').mouseout(function () {
-	navbarMousedOver = false;
-	if (!hamburgerMenuOpen) {
-		navFadeAnimID = setInterval(navbarFade(0, 1), FRAME_INTERVAL);
-	}
-});
 
 let hamburgerMenuOpen = false;
 
 let currentHamburgerMenuOpenness = 0;
 
-function setHamburgerMenuOpenness(percentage) {
+function setHamburgerMenuOpenness(percentage: number) {
 	let menu = $('#hamburger-menu');
 	//The +1 is for the 1px wide border
 	let menuWidth = menu.innerWidth() + 1;
@@ -287,7 +211,7 @@ function setHamburgerMenuOpenness(percentage) {
 
 let menuOpenAnimID = NO_ANIM;
 
-function hamburgerMenuSlide(start, end) {
+function hamburgerMenuSlide(start: number, end: number) {
 	if (menuOpenAnimID != NO_ANIM) {
 		clearInterval(menuOpenAnimID);
 	}
@@ -315,15 +239,11 @@ function hamburgerMenuSlide(start, end) {
 function openHamburgerMenu() {
 	menuOpenAnimID = setInterval(hamburgerMenuSlide(0, 1), FRAME_INTERVAL);
 	hamburgerMenuOpen = true;
-	navFadeAnimID = setInterval(navbarFade(1, 0), FRAME_INTERVAL);
 }
 
 function closeHamburgerMenu() {
 	menuOpenAnimID = setInterval(hamburgerMenuSlide(1, 0), FRAME_INTERVAL);
 	hamburgerMenuOpen = false;
-	if (!navbarMousedOver) {
-		navFadeAnimID = setInterval(navbarFade(0, 1), FRAME_INTERVAL);
-	}
 }
 
 function toggleHamburgerMenu() {
