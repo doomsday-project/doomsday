@@ -6,6 +6,6 @@
 		"removeComments": true
 	},
 	"include": [
-		"./js/**/*"
+		"./ts/**/*"
 	]
 }
