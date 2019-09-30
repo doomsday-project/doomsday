@@ -40,6 +40,36 @@ class Doomsday {
             .then(data => data.content, this.handleFailure);
     }
 }
+class Color {
+    constructor(red, green, blue) {
+        this.red = red;
+        this.green = green;
+        this.blue = blue;
+    }
+    get 0() { return this.red; }
+    get 1() { return this.green; }
+    get 2() { return this.blue; }
+    hex() {
+        return "#" + this.cAsHex(this.red) + this.cAsHex(this.green) + this.cAsHex(this.blue);
+    }
+    shift(c2, percent) {
+        return new Color(this.red + ((c2.red - this.red) * percent), this.green + ((c2.green - this.green) * percent), this.blue + ((c2.blue - this.blue) * percent));
+    }
+    cAsHex(c) {
+        var hex = c.toString(16);
+        return hex.length == 1 ? "0" + hex : hex;
+        ;
+    }
+}
+var Colors;
+(function (Colors) {
+    Colors.Black = new Color(0, 0, 0);
+    Colors.Red = new Color(229, 53, 69);
+    Colors.Orange = new Color(253, 126, 20);
+    Colors.OrangeYellow = new Color(255, 193, 7);
+    Colors.Yellow = new Color(200, 185, 15);
+    Colors.Green = new Color(40, 167, 69);
+})(Colors || (Colors = {}));
 function getCookie(name) {
     let state = 0;
     let length = document.cookie.length;
@@ -214,11 +244,11 @@ class DashboardPage extends PageBase {
                 }
                 if (lists.length == 0 || cert.not_after > lists[lists.length - 1].cutoff) {
                     let maxDays = Math.max(0, Math.ceil((cert.not_after - now) / 86400));
-                    let label = durationString(maxDays - 1);
+                    let label = this.durationString(maxDays - 1);
                     lists.push({
                         header: label,
                         cutoff: now + (maxDays * 86400),
-                        color: cardColor(maxDays - 1),
+                        color: this.cardColor(maxDays - 1),
                         certs: [cert]
                     });
                 }
@@ -244,60 +274,53 @@ class DashboardPage extends PageBase {
             }
         });
     }
-}
-function durationString(days) {
-    if (days < 0) {
-        return "THE DAWN OF TIME";
-    }
-    else if (days == 0) {
-        return "NOW";
-    }
-    else if (days == 1) {
-        return "1 DAY";
-    }
-    else if (days < 7) {
-        return days + " DAYS";
-    }
-    else {
-        var weeks = Math.floor(days / 7);
-        var remaining_days = days - (weeks * 7);
-        var ret = weeks + " WEEKS";
-        if (weeks == 1) {
-            ret = "1 WEEK";
+    durationString(days) {
+        if (days < 0) {
+            return "THE DAWN OF TIME";
         }
-        if (remaining_days > 0) {
-            ret = ret + ", " + durationString(remaining_days);
+        else if (days == 0) {
+            return "NOW";
         }
-        return ret;
+        else if (days == 1) {
+            return "1 DAY";
+        }
+        else if (days < 7) {
+            return days + " DAYS";
+        }
+        else {
+            var weeks = Math.floor(days / 7);
+            var remaining_days = days - (weeks * 7);
+            var ret = weeks + " WEEKS";
+            if (weeks == 1) {
+                ret = "1 WEEK";
+            }
+            if (remaining_days > 0) {
+                ret = ret + ", " + this.durationString(remaining_days);
+            }
+            return ret;
+        }
     }
-}
-function cardColor(days) {
-    if (days < 0) {
-        return [0, 0, 0];
+    cardColor(days) {
+        if (days < 0) {
+            return Colors.Black;
+        }
+        else if (days < 3) {
+            return Colors.Red;
+        }
+        else if (days < 7) {
+            return Colors.Red.shift(Colors.Orange, 1 - ((7 - days) / 4));
+        }
+        else if (days < 14) {
+            return Colors.Orange.shift(Colors.OrangeYellow, 1 - ((14 - days) / 7));
+        }
+        else if (days < 21) {
+            return Colors.OrangeYellow.shift(Colors.Yellow, 1 - ((21 - days) / 7));
+        }
+        else if (days < 28) {
+            return Colors.Yellow.shift(Colors.Green, 1 - ((28 - days) / 7));
+        }
+        return Colors.Green;
     }
-    else if (days < 3) {
-        return [229, 53, 69];
-    }
-    else if (days < 7) {
-        return colorShift([229, 53, 69], [253, 126, 20], (7 - days) / 4);
-    }
-    else if (days < 14) {
-        return colorShift([253, 126, 20], [255, 193, 7], (14 - days) / 7);
-    }
-    else if (days < 21) {
-        return colorShift([255, 193, 7], [200, 185, 15], (21 - days) / 7);
-    }
-    else if (days < 28) {
-        return colorShift([200, 185, 15], [40, 167, 69], (28 - days) / 7);
-    }
-    return [40, 167, 69];
-}
-function colorShift(end, start, percent) {
-    return [
-        start[0] + ((end[0] - start[0]) * percent),
-        start[1] + ((end[1] - start[1]) * percent),
-        start[2] + ((end[2] - start[2]) * percent)
-    ];
 }
 let NORMAL_HAMBURGER_WIDTH;
 let NORMAL_HAMBURGER_HEIGHT;

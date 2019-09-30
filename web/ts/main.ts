@@ -3,63 +3,12 @@
 /// <reference path="./cookie.ts"/>
 /// <reference path="./pages/login.ts"/>
 /// <reference path="./pages/certs.ts"/>
+/// <reference path="./color.ts"/>
 
 //Because Lens.js adds template to $()
 interface JQuery {
 	template(template: string, options?: object): any;
 }
-
-function durationString(days: number) {
-	if (days < 0) {
-		return "THE DAWN OF TIME";
-	} else if (days == 0) {
-		return "NOW";
-	} else if (days == 1) {
-		return "1 DAY";
-	} else if (days < 7) {
-		return days + " DAYS";
-	} else {
-		var weeks = Math.floor(days / 7);
-		var remaining_days = days - (weeks * 7);
-		var ret = weeks + " WEEKS";
-		if (weeks == 1) {
-			ret = "1 WEEK";
-		}
-		if (remaining_days > 0) {
-			ret = ret + ", " + durationString(remaining_days);
-		}
-		return ret;
-	}
-}
-
-function cardColor(days: number) {
-	if (days < 0) {
-		return [0, 0, 0];
-	} else if (days < 3) {
-		return [229, 53, 69]; //red
-	} else if (days < 7) {
-		return colorShift([229, 53, 69], [253, 126, 20], (7 - days) / 4);
-	} else if (days < 14) {
-		return colorShift([253, 126, 20], [255, 193, 7], (14 - days) / 7);
-	} else if (days < 21) {
-		return colorShift([255, 193, 7], [200, 185, 15], (21 - days) / 7);
-	} else if (days < 28) {
-		return colorShift([200, 185, 15], [40, 167, 69], (28 - days) / 7);
-	}
-
-	return [40, 167, 69];
-}
-
-type Color = [number, number, number]
-
-function colorShift(end: Color, start: Color, percent: number) {
-	return [
-		start[0] + ((end[0] - start[0]) * percent),
-		start[1] + ((end[1] - start[1]) * percent),
-		start[2] + ((end[2] - start[2]) * percent)
-	];
-}
-
 
 let NORMAL_HAMBURGER_WIDTH;
 let NORMAL_HAMBURGER_HEIGHT;
