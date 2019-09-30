@@ -1,4 +1,8 @@
 /// <reference path="./client.ts"/>
+/// <reference path="./pager.ts"/>
+/// <reference path="./cookie.ts"/>
+/// <reference path="./pages/login.ts"/>
+/// <reference path="./pages/certs.ts"/>
 
 //Because Lens.js adds template to $()
 interface JQuery {
@@ -56,55 +60,7 @@ function colorShift(end: Color, start: Color, percent: number) {
 	];
 }
 
-function updateCertList() {
-	doomsday.fetchCerts()
-		.then(content => {
-			var now = new Date().getTime() / 1000;
 
-			var lists = [];
-
-			for (var i = 0; i < content.length; i++) {
-				var cert = content[i];
-				if (cert.not_after - now > 7776000) {
-					break;
-				}
-
-				if (lists.length == 0 || cert.not_after > lists[lists.length - 1].cutoff) {
-					var maxDays = Math.max(0, Math.ceil((cert.not_after - now) / 86400));
-					var label = durationString(maxDays - 1);
-					lists.push({
-						header: label,
-						cutoff: now + (maxDays * 86400),
-						color: cardColor(maxDays - 1),
-						certs: [cert]
-					});
-				} else {
-					lists[lists.length - 1].certs.push(cert);
-				}
-			}
-
-			console.log(lists.length);
-
-			if (lists.length == 0) {
-				$("#certs").template("no-certs-page");
-				return;
-			}
-
-			$("#certs").template("cert-list-group", { lists: lists });
-			$("#certs").show();
-			certUpdateID = setTimeout(updateCertList, 60 * 1000);
-		})
-		.catch(e => {
-			if (e.error == "error" && e.code == 401) {
-				deleteCookie('doomsday-token');
-				gotoLogin("Your session has expired");
-			} else {
-				gotoLogin("Something went wrong!");
-			}
-		});
-}
-
-let doomsday = new Doomsday();
 let NORMAL_HAMBURGER_WIDTH;
 let NORMAL_HAMBURGER_HEIGHT;
 let HAMBURGER_BOX_PADDING;
@@ -114,6 +70,9 @@ $(document).ready(function () {
 	NORMAL_HAMBURGER_WIDTH = hamburgerBox.width();
 	NORMAL_HAMBURGER_HEIGHT = $('#hamburger').height();
 	HAMBURGER_BOX_PADDING = hamburgerBox.innerWidth() - NORMAL_HAMBURGER_WIDTH;
+
+	let doomsday = new Doomsday();
+	let pager = new Pager(doomsday);
 
 	doomsday.fetchAuthType()
 		.then(authType => {
@@ -126,64 +85,18 @@ $(document).ready(function () {
 			} else {
 				$('#logout-button').click(function () {
 					closeHamburgerMenu();
-					handleLogout();
+					deleteCookie('doomsday-token');
+					pager.display(new LoginPage());
 				});
 			}
 			if (authType == AuthMethod.USERPASS && getCookie('doomsday-token') == "") {
-				gotoLogin();
+				pager.display(new LoginPage());
 			} else {
-				gotoDashboard();
+				pager.display(new DashboardPage());
 			}
 		})
 		.catch(() => { console.log("Something went wrong!"); });
 });
-
-let certUpdateID = -1;
-
-function handleLogin(e) {
-	let username = ($('input[name=username]').val() as string);
-	let password = ($('input[name=password]').val() as string);
-	doomsday.authUser(username, password)
-		.then(() => { gotoDashboard(); })
-		.catch(e => {
-			if (e.error == "error" && e.code == 401) {
-				gotoLogin("The username and password did not match");
-			}
-			else { gotoLogin("Something went wrong!"); }
-		});
-	return false;
-}
-
-function handleLogout() {
-	deleteCookie('doomsday-token');
-	gotoLogin();
-}
-
-function gotoLogin(message?: string) {
-	clearTimeout(certUpdateID);
-	certUpdateID = -1;
-	$("#certs").hide();
-	$("#hamburger-box").hide();
-
-	var templateParams: { error_message?: string } = {};
-	if (typeof message !== 'undefined') {
-		templateParams.error_message = message;
-	}
-	$("#login").template("login-page", templateParams);
-
-	$("#login-form").submit(handleLogin);
-	$("#login-form input[name=password]").val("");
-	$("#login").show();
-}
-
-function gotoDashboard() {
-	$("#login").hide();
-	$("#login-form").off("submit");
-	$("#certs").show();
-	$('#hamburger-box').show();
-
-	updateCertList();
-}
 
 const FRAMERATE = 42;
 const FRAME_INTERVAL = 1000 / FRAMERATE;
@@ -257,67 +170,3 @@ function toggleHamburgerMenu() {
 $('#hamburger-box').click(function () {
 	toggleHamburgerMenu();
 });
-
-
-function getCookie(name: string) {
-	let state = 0;
-	let length = document.cookie.length;
-	let found = false;
-	let key = "";
-	let value = "";
-	function checkKey() {
-		if (key == name) {
-			found = true;
-		} else {
-			key = "";
-			value = "";
-			state = 2;
-		}
-	}
-	for (let i = 0; i < length && !found; i++) {
-		let c = document.cookie.charAt(i);
-		switch (state) {
-			case 0: //parsing from the start of the cookie
-				if (c == '=') {
-					state = 1;
-				} else if (c == ';') {
-					value = key;
-					key = "";
-					checkKey();
-				} else {
-					key = key + c;
-				}
-				break;
-			case 1: //parsing from after the '=' of a cookie
-				if (c == ';') {
-					checkKey();
-				} else {
-					value = value + c;
-				}
-				break;
-			case 2: //chew through whitespace after semicolon
-				if (c == '=') {
-					key = "";
-					state = 1;
-				} else if (c == ';') {
-					key = "";
-					value = "";
-					checkKey();
-				} else if (c != ' ' && c != '\t') {
-					key = c;
-					state = 0;
-				}
-				break;
-		}
-	}
-
-	if (!found && key != name) {
-		value = "";
-	}
-
-	return value;
-}
-
-function deleteCookie(name: string) {
-	document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-}

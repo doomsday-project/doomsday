@@ -1,6 +1,6 @@
 {
 	"compilerOptions": {
-		"outDir": "./build",
+		"outFile": "./build/doomsday.js",
 		"allowJs": true,
 		"target": "es6",
 		"removeComments": true
