@@ -1,3 +1,4 @@
+/// <reference path="../color.ts"/>
 class DashboardPage extends PageBase {
   private certUpdateID: number;
   private certsElement: JQuery;
