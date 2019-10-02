@@ -1,7 +1,7 @@
 web/index.html:
   servePath: /
   mimeType: text/html
-web/stylesheet.css: 
+web/stylesheet.css:
   servePath: /web/assets/stylesheet.css
   mimeType: text/css
 web/fonts.css:
@@ -19,9 +19,6 @@ web/fonts/Pangolin/Pangolin-Regular.ttf:
 web/fonts/Walter_Turncoat/WalterTurncoat-Regular.ttf:
   servePath: /web/assets/fonts/WalterTurncoat.ttf
   mimeType: font/opentype
-web/js/client.js:
-  servePath: /web/assets/js/client.js
-  mimeType: application/javascript
-web/js/main.js:
-  servePath: /web/assets/js/main.js
+web/build/doomsday.js:
+  servePath: /web/assets/js/doomsday.js
   mimeType: application/javascript

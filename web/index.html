@@ -1,8 +1,8 @@
 <html>
 <head>
-	<meta charset="UTF-8"> 
+	<meta charset="UTF-8">
 	<title>Doomsday</title>
-  <link rel='stylesheet' type='text/css' href="web/assets/fonts.css"> 
+  <link rel='stylesheet' type='text/css' href="web/assets/fonts.css">
   <link rel='stylesheet' type='text/css' href='web/assets/stylesheet.css'>
 </head>
 <body>
@@ -37,15 +37,15 @@
 				<form id="login-form">
 					<div class="login-text-box">
 						<label for="login-form-username">Username</label>
-						<input type="text" 
-						       name="username" 
-									 id="login-form-username-input" 
+						<input type="text"
+						       name="username"
+									 id="login-form-username-input"
 						/>
 					</div>
 					<div class="login-text-box">
 						<label for="login-form-password">Password</label>
-						<input type="password" 
-						       name="password" 
+						<input type="password"
+						       name="password"
 						       id="login-form-password-input"
 						/>
 					</div>
@@ -86,7 +86,7 @@
 			  var i = 0;
 				for (; i < backends.length; i++) {
 					if (path.backend == backends[i].name) {
-						backendFound = true; 
+						backendFound = true;
 					  backends[i].paths.push(path.location);
 						break;
 					}
@@ -94,17 +94,17 @@
 
 				if (!backendFound) {
 					backends.push({name: path.backend, paths: [path.location]});
-				} 
+				}
 			});
 
 			backends.sort( (x, y) => (x.name < y.name ? -1 : 1) );
-			backends.forEach(function(b, i) { 
+			backends.forEach(function(b, i) {
 		]]
 		<div class="certs-content-path-backend-container">
 			<div class="certs-content-label certs-content-backend-label">[[= lens.escapeHTML(b.name) ]]</div>
 			<div class="certs-content-path-backend-paths-container">
 		[[
-				backends[i].paths.sort(); 
+				backends[i].paths.sort();
 		]]
 		    <div class="certs-content-value">[[= lens.escapeHTML(backends[i].paths[0]) ]]</div>
 		[[
@@ -123,14 +123,14 @@
 	</script>
 
 	<script type="text/html" id="template:cert-card-line">
-		[[ 
+		[[
 		  if (!Array.isArray(_.value)) {
 				_.value = [ _.value ];
 		  }
 		]]
 		<div class="certs-content-label">[[= _.label ]]</div>
 		<div class="certs-content-value">[[= _.value[0] ]]</div>
-		[[ 
+		[[
 		if (_.value.length > 1) {
 		  _.value.slice(1).forEach(function(v) {
 		]]
@@ -180,7 +180,7 @@
 				[[
 					_.certs.forEach(function(v) {
 						lens.include("cert-card", { cert: v, color: _.color });
-					}); 
+					});
 				]]
 				</div>
 				<div class="cert-list-body-timeline-container">
@@ -204,7 +204,6 @@
 		]]
 	</script>
 
-	<script type="application/javascript" src="web/assets/js/client.js"></script>
-	<script type="application/javascript" src="web/assets/js/main.js"></script>
+	<script type="application/javascript" src="web/assets/js/doomsday.js"></script>
 </body>
 </html>
