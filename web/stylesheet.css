@@ -52,6 +52,40 @@
 	width: 100%;
 }
 
+.center-box {
+	display: flex;
+	justify-content: center;
+	align-content: center;
+	width: 100%;
+}
+
+#certs-show-more {
+	font-size: 24px;
+	font-weight: bold;
+	font-family: inherit;
+	color: white;
+	margin: 1em;
+	padding: 0.5em;
+	border-color: white;
+	border-style: solid;
+	border-radius: 8px;
+	border-width: thick;
+	background-color: rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+#certs-show-more:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+#certs-show-more:active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+#certs-show-more:disabled {
+	background-color: rgba(255, 255, 255, 0.0)
+}
+
 .login-text-box {
 	margin: 0.75em 1.5em;
 	width: 100%;

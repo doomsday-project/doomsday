@@ -37,7 +37,7 @@ class Doomsday {
 		throw new APIError(textStatus, jqXHR.status);
 	}
 
-	fetchAuthType(): Promise<any> {
+	fetchAuthType(): Promise<AuthMethod> {
 		return this.doRequest("GET", "/v1/info")
 			.then(
 				data => (data.auth_type == "Userpass" ? AuthMethod.USERPASS : AuthMethod.NONE),
@@ -45,7 +45,7 @@ class Doomsday {
 			);
 	}
 
-	authUser(username: string, password: string): Promise<any> {
+	authUser(username: string, password: string): Promise<void> {
 		return this.doRequest("POST", "/v1/auth", {
 			username: username,
 			password: password
@@ -56,9 +56,29 @@ class Doomsday {
 			);
 	}
 
-	fetchCerts(): Promise<any> {
+	fetchCerts(): Promise<Array<Certificate>> {
 		return this.doRequest("GET", "/v1/cache")
-			.then(data => data.content,
+			.then(data => {
+				let ret: Array<Certificate> = [];
+				for (let cert of data.content) {
+					ret.push(($.extend(new Certificate(), cert) as Certificate))
+				}
+				return ret;
+			},
 				this.handleFailure);
 	}
+}
+
+class Certificate {
+	common_name: string;
+	not_after: number;
+	paths: Array<CertificateStoragePath>;
+
+	get commonName(): string { return this.common_name; }
+	get notAfter(): number { return this.not_after; }
+}
+
+class CertificateStoragePath {
+	backend: string;
+	location: string;
 }

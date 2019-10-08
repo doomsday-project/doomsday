@@ -2,6 +2,11 @@
 class DashboardPage extends PageBase {
   private certUpdateID: number;
   private certsElement: JQuery;
+  private showMoreButton: JQuery;
+  private certs: CertificateList;
+  private shouldShowAll: boolean;
+
+  static readonly DEFAULT_EXPIRY_CUTOFF: number = 7776000;
   constructor() {
     super();
     this.certUpdateID = -1;
@@ -10,6 +15,8 @@ class DashboardPage extends PageBase {
 
   initialize(): void {
     this.certsElement.show();
+    this.certs = new CertificateList();
+
     this.updateCertList();
   }
 
@@ -17,44 +24,15 @@ class DashboardPage extends PageBase {
     clearTimeout(this.certUpdateID);
     this.certUpdateID = -1;
     this.certsElement.hide();
+    this.showMoreButton.off();
   }
+
   private updateCertList() {
     this.ctx.client.fetchCerts()
-      .then(content => {
-        let now = new Date().getTime() / 1000;
-
-        let lists = [];
-
-        for (var i = 0; i < content.length; i++) {
-          let cert = content[i];
-          if (cert.not_after - now > 7776000) {
-            break;
-          }
-
-          if (lists.length == 0 || cert.not_after > lists[lists.length - 1].cutoff) {
-            let maxDays = Math.max(0, Math.ceil((cert.not_after - now) / 86400));
-            let label = this.durationString(maxDays - 1);
-            lists.push({
-              header: label,
-              cutoff: now + (maxDays * 86400),
-              color: this.cardColor(maxDays - 1),
-              certs: [cert]
-            });
-          } else {
-            lists[lists.length - 1].certs.push(cert);
-          }
-        }
-
-        //console.log(lists.length);
-
-        if (lists.length == 0) {
-          this.certsElement.template("no-certs-page");
-          return;
-        }
-
-        this.certsElement.template("cert-list-group", { lists: lists });
-        this.certsElement.show();
-        this.certUpdateID = setTimeout(this.updateCertList, 60 * 1000);
+      .then((content: Array<Certificate>) => {
+        this.certs = new CertificateList(content);
+        this.repaint();
+        this.certUpdateID = setTimeout(this.updateCertList.bind(this), 60 * 1000);
       })
       .catch(e => {
         if (e.error == "error" && e.code == 401) {
@@ -66,8 +44,51 @@ class DashboardPage extends PageBase {
       });
   }
 
+  private repaint() {
+    let now = new Date().getTime() / 1000;
+    let lists = [];
+    let certsToDisplay = this.certs;
+    if (!this.shouldShowAll) {
+      certsToDisplay = this.certs.expiresWithin(DashboardPage.DEFAULT_EXPIRY_CUTOFF)
+    }
+    for (let cert of certsToDisplay) {
+      if (lists.length == 0 || cert.notAfter > lists[lists.length - 1].cutoff) {
+        let maxDays = Math.max(0, Math.ceil((cert.not_after - now) / 86400));
+        let label = this.durationString(maxDays - 1);
+        lists.push({
+          header: label,
+          cutoff: now + (maxDays * 86400),
+          color: this.cardColor(maxDays - 1),
+          certs: [cert]
+        });
+      } else {
+        lists[lists.length - 1].certs.push(cert);
+      }
+    }
 
-  private durationString(days: number) {
+    if (lists.length == 0) {
+      this.certsElement.template("no-certs-page");
+      return;
+    }
+
+    this.certsElement.template("cert-list-group", { lists: lists });
+    this.showMoreButton = $("#certs-show-more");
+    this.showMoreButton.on("click", (e: JQuery.Event) => {
+      e.preventDefault();
+      this.showMoreButton.prop("disabled", true);
+      this.showMoreButton.html("working...");
+      this.shouldShowAll = !this.shouldShowAll;
+      this.repaint();
+      this.showMoreButton = $("#certs-show-more");
+      this.showMoreButton.html("show " + (this.shouldShowAll ? "less" : "all"));
+      this.showMoreButton.prop("disabled", false);
+      return false;
+    })
+    this.certsElement.show();
+  }
+
+
+  private durationString(days: number): string {
     if (days < 0) {
       return "THE DAWN OF TIME";
     } else if (days == 0) {
@@ -90,7 +111,7 @@ class DashboardPage extends PageBase {
     }
   }
 
-  private cardColor(days: number) {
+  private cardColor(days: number): Color {
     if (days < 0) {
       return Colors.Black;
     } else if (days < 3) {
@@ -106,5 +127,63 @@ class DashboardPage extends PageBase {
     }
 
     return Colors.Green;
+  }
+}
+
+/**
+ * A list of Certificates
+ *
+ * @remarks
+ * Given input must currently be presented in a sorted order
+ */
+class CertificateList {
+  private storage: Array<Certificate>
+  private expMax: number; //inclusive
+
+  constructor(initial?: Array<Certificate>) {
+    this.storage = [];
+    if (initial) {
+      this.storage = initial;
+    }
+  }
+
+  [Symbol.iterator]() {
+    const now = new Date().getTime() / 1000;
+    const maxUntil: number =
+      (typeof this.expMax === 'number' ? this.expMax : Number.MAX_VALUE);
+    let idx: number = 0;
+    return {
+      next: () => {
+        let isDone = () => {
+          if (idx >= this.storage.length) {
+            return true;
+          }
+          if (this.storage[idx].notAfter - now > maxUntil) {
+            return true;
+          }
+          return false;
+        }
+        let done: boolean = isDone();
+        return {
+          done: done,
+          value: done ? undefined : this.storage[idx++]
+        }
+      }
+    }
+  }
+
+  get length(): number { return this.storage.length; }
+
+  /**
+   * Returns a new CertificateStore which, when iterated over, will only yield
+   * the elements of the CertificateStore which expire within the given timespan.
+   *
+   * @param duration Number of seconds from now a cert must expire within to
+   *   be returned.
+   */
+  expiresWithin(duration: number): CertificateList {
+    let ret: CertificateList = new CertificateList(this.storage);
+    ret.expMax = duration;
+    return ret;
   }
 }

@@ -37,8 +37,20 @@ class Doomsday {
     }
     fetchCerts() {
         return this.doRequest("GET", "/v1/cache")
-            .then(data => data.content, this.handleFailure);
+            .then(data => {
+            let ret = [];
+            for (let cert of data.content) {
+                ret.push($.extend(new Certificate(), cert));
+            }
+            return ret;
+        }, this.handleFailure);
     }
+}
+class Certificate {
+    get commonName() { return this.common_name; }
+    get notAfter() { return this.not_after; }
+}
+class CertificateStoragePath {
 }
 class Color {
     constructor(red, green, blue) {
@@ -225,44 +237,21 @@ class DashboardPage extends PageBase {
     }
     initialize() {
         this.certsElement.show();
+        this.certs = new CertificateList();
         this.updateCertList();
     }
     teardown() {
         clearTimeout(this.certUpdateID);
         this.certUpdateID = -1;
         this.certsElement.hide();
+        this.showMoreButton.off();
     }
     updateCertList() {
         this.ctx.client.fetchCerts()
-            .then(content => {
-            let now = new Date().getTime() / 1000;
-            let lists = [];
-            for (var i = 0; i < content.length; i++) {
-                let cert = content[i];
-                if (cert.not_after - now > 7776000) {
-                    break;
-                }
-                if (lists.length == 0 || cert.not_after > lists[lists.length - 1].cutoff) {
-                    let maxDays = Math.max(0, Math.ceil((cert.not_after - now) / 86400));
-                    let label = this.durationString(maxDays - 1);
-                    lists.push({
-                        header: label,
-                        cutoff: now + (maxDays * 86400),
-                        color: this.cardColor(maxDays - 1),
-                        certs: [cert]
-                    });
-                }
-                else {
-                    lists[lists.length - 1].certs.push(cert);
-                }
-            }
-            if (lists.length == 0) {
-                this.certsElement.template("no-certs-page");
-                return;
-            }
-            this.certsElement.template("cert-list-group", { lists: lists });
-            this.certsElement.show();
-            this.certUpdateID = setTimeout(this.updateCertList, 60 * 1000);
+            .then((content) => {
+            this.certs = new CertificateList(content);
+            this.repaint();
+            this.certUpdateID = setTimeout(this.updateCertList.bind(this), 60 * 1000);
         })
             .catch(e => {
             if (e.error == "error" && e.code == 401) {
@@ -273,6 +262,47 @@ class DashboardPage extends PageBase {
                 this.ctx.pager.display(new LoginPage("Something went wrong!"));
             }
         });
+    }
+    repaint() {
+        let now = new Date().getTime() / 1000;
+        let lists = [];
+        let certsToDisplay = this.certs;
+        if (!this.shouldShowAll) {
+            certsToDisplay = this.certs.expiresWithin(DashboardPage.DEFAULT_EXPIRY_CUTOFF);
+        }
+        for (let cert of certsToDisplay) {
+            if (lists.length == 0 || cert.notAfter > lists[lists.length - 1].cutoff) {
+                let maxDays = Math.max(0, Math.ceil((cert.not_after - now) / 86400));
+                let label = this.durationString(maxDays - 1);
+                lists.push({
+                    header: label,
+                    cutoff: now + (maxDays * 86400),
+                    color: this.cardColor(maxDays - 1),
+                    certs: [cert]
+                });
+            }
+            else {
+                lists[lists.length - 1].certs.push(cert);
+            }
+        }
+        if (lists.length == 0) {
+            this.certsElement.template("no-certs-page");
+            return;
+        }
+        this.certsElement.template("cert-list-group", { lists: lists });
+        this.showMoreButton = $("#certs-show-more");
+        this.showMoreButton.on("click", (e) => {
+            e.preventDefault();
+            this.showMoreButton.prop("disabled", true);
+            this.showMoreButton.html("working...");
+            this.shouldShowAll = !this.shouldShowAll;
+            this.repaint();
+            this.showMoreButton = $("#certs-show-more");
+            this.showMoreButton.html("show " + (this.shouldShowAll ? "less" : "all"));
+            this.showMoreButton.prop("disabled", false);
+            return false;
+        });
+        this.certsElement.show();
     }
     durationString(days) {
         if (days < 0) {
@@ -320,6 +350,44 @@ class DashboardPage extends PageBase {
             return Colors.Yellow.shift(Colors.Green, 1 - ((28 - days) / 7));
         }
         return Colors.Green;
+    }
+}
+DashboardPage.DEFAULT_EXPIRY_CUTOFF = 7776000;
+class CertificateList {
+    constructor(initial) {
+        this.storage = [];
+        if (initial) {
+            this.storage = initial;
+        }
+    }
+    [Symbol.iterator]() {
+        const now = new Date().getTime() / 1000;
+        const maxUntil = (typeof this.expMax === 'number' ? this.expMax : Number.MAX_VALUE);
+        let idx = 0;
+        return {
+            next: () => {
+                let isDone = () => {
+                    if (idx >= this.storage.length) {
+                        return true;
+                    }
+                    if (this.storage[idx].notAfter - now > maxUntil) {
+                        return true;
+                    }
+                    return false;
+                };
+                let done = isDone();
+                return {
+                    done: done,
+                    value: done ? undefined : this.storage[idx++]
+                };
+            }
+        };
+    }
+    get length() { return this.storage.length; }
+    expiresWithin(duration) {
+        let ret = new CertificateList(this.storage);
+        ret.expMax = duration;
+        return ret;
     }
 }
 let NORMAL_HAMBURGER_WIDTH;
