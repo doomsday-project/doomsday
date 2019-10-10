@@ -471,7 +471,7 @@ var _ = Describe("KVv2", func() {
 				Describe("V2Delete", func() {
 					var testDeleteOpts *vaultkv.V2DeleteOpts
 					JustBeforeEach(func() {
-						vault.V2Delete(testMountName, path(testMountName, testSetPath), testDeleteOpts)
+						err = vault.V2Delete(testMountName, path(testMountName, testSetPath), testDeleteOpts)
 					})
 
 					AfterEach(func() {

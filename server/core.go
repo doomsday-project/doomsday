@@ -85,11 +85,17 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateSta
 	successCount := 0
 	statLock := sync.Mutex{}
 
+	var errLock sync.Mutex
+	var errors []error
+
 	fetch := func() {
 		mySuccessCount, myCertCount := 0, 0
 		for path := range queue {
 			secret, err := b.Backend.Get(path)
 			if err != nil {
+				errLock.Lock()
+				errors = append(errors, err)
+				errLock.Unlock()
 				continue
 			}
 
@@ -135,11 +141,15 @@ func (b *Core) populateUsing(cache *Cache, paths storage.PathList) (*PopulateSta
 
 	barrier.Wait()
 
+	if len(errors) == 0 {
+		errors = append(errors, nil)
+	}
+
 	return &PopulateStats{
 		NumPaths:   len(paths),
 		NumSuccess: successCount,
 		NumCerts:   certCount,
-	}, nil
+	}, errors[0]
 }
 
 func parseCert(c string) []*x509.Certificate {

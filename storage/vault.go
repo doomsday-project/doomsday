@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/cloudfoundry-community/vaultkv"
 )
@@ -22,7 +23,9 @@ type VaultConfig struct {
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
 	BasePath           string `yaml:"base_path"`
 	Auth               struct {
-		Token string `yaml:"token"`
+		Token    string `yaml:"token"`
+		RoleID   string `yaml:"role_id"`
+		SecretID string `yaml:"secret_id"`
 	} `yaml:"auth"`
 }
 
@@ -44,20 +47,82 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 		conf.BasePath = "secret/"
 	}
 
-	return &VaultAccessor{
-		client: (&vaultkv.Client{
-			VaultURL:  u,
-			AuthToken: conf.Auth.Token,
-			Client: &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: conf.InsecureSkipVerify,
-					},
-					MaxIdleConnsPerHost: runtime.NumCPU(),
+	client := &vaultkv.Client{
+		VaultURL:  u,
+		AuthToken: conf.Auth.Token,
+		Client: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: conf.InsecureSkipVerify,
 				},
+				MaxIdleConnsPerHost: runtime.NumCPU(),
 			},
-			//Trace: os.Stdout,
-		}).NewKV(),
+		},
+		//Trace: os.Stdout,
+	}
+
+	var shouldRenew bool
+	var ttl time.Duration
+	if conf.Auth.RoleID != "" || conf.Auth.SecretID != "" {
+		if conf.Auth.Token != "" {
+			return nil, fmt.Errorf("Cannot provide both Token and AppRole authentication methods")
+		}
+
+		output, err := client.AuthApprole(conf.Auth.RoleID, conf.Auth.SecretID)
+		if err != nil {
+			return nil, fmt.Errorf("Error performing AppRole authentication: %s", err)
+		}
+
+		if output.Renewable {
+			shouldRenew = true
+			ttl = output.LeaseDuration
+		}
+	} else {
+		//It's a token!
+		info, err := client.TokenInfoSelf()
+		if err != nil {
+			return nil, fmt.Errorf("Error looking up token information: %s", err)
+		}
+
+		//Is it a renewable token?
+		if info.Renewable {
+			shouldRenew = true
+			ttl = info.CreationTTL
+			if ttl > 0 {
+				//Give it an initial renew so that its remaining TTL is similar to its total TTL
+				err = client.TokenRenewSelf()
+				if err != nil {
+					return nil, fmt.Errorf("Could not perform initial renewal of renewable token: %s", err)
+				}
+			}
+		}
+	}
+
+	if shouldRenew && ttl > 0 {
+		renewalInterval := ttl / 2
+		fmt.Printf("Renewing Vault token every %s\n", renewalInterval)
+		go func() {
+			for range time.Tick(ttl / 2) {
+				fmt.Println("Attempting to renew Vault token")
+				err = client.TokenRenewSelf()
+				if err != nil {
+					fmt.Printf("Failed to renew token to Vault: %s\n", err)
+				}
+
+				fmt.Println("Successfully renewed Vault token")
+			}
+		}()
+	} else {
+		fmt.Printf("Will not renew Vault token because ")
+		if !shouldRenew {
+			fmt.Printf("token is not renewable\n")
+		} else if ttl <= 0 {
+			fmt.Printf("token never expires\n")
+		}
+	}
+
+	return &VaultAccessor{
+		client:   client.NewKV(),
 		basePath: conf.BasePath,
 	}, nil
 

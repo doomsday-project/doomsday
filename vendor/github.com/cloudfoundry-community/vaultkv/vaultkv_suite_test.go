@@ -106,7 +106,6 @@ func (s1 semver) LessThan(s2 semver) bool {
 var vault *vaultkv.Client
 var err error
 
-var vaultVersions []string
 var currentVaultVersion string
 
 var currentVaultProcess *os.Process
@@ -114,10 +113,9 @@ var processChan = make(chan *os.ProcessState)
 var processOutputWriter, processOutputReader *os.File
 
 var (
-	vaultProcessLocation string
-	configLocation       string
-	certLocation         string
-	keyLocation          string
+	configLocation string
+	certLocation   string
+	keyLocation    string
 )
 
 var vaultURI *url.URL
@@ -343,10 +341,10 @@ func StartVault(version string) {
 
 	loggingBuffer := &bytes.Buffer{}
 
-	go io.Copy(loggingBuffer, processOutputReader)
+	go func() { _, _ = io.Copy(loggingBuffer, processOutputReader) }()
 	defer func() {
 		if currentVaultProcess == nil {
-			io.Copy(GinkgoWriter, loggingBuffer)
+			_, _ = io.Copy(GinkgoWriter, loggingBuffer)
 		}
 	}()
 
@@ -414,7 +412,7 @@ func StopVault() {
 		panic(fmt.Sprintf("Could not send interrupt signal to Vault process: %s", err))
 	}
 
-	_ = <-processChan
+	<-processChan
 	processOutputWriter.Close()
 	processOutputReader.Close()
 	currentVaultProcess = nil
