@@ -30,9 +30,16 @@ backends:
     # path will be searched. Defaults to "secret/" if not present.
     base_path: "secret/"
     # (hash) Options for authorizing to Vault
+    # Must either provide "token" for Token auth or "role_id" and "secret_id" for AppRole
+    # If a token is given, it should either have no expiry or be renewable.
+    # If AppRole credentials are given, the token that is generated should be renewable.
     auth:
       # (string) A Vault authentication token.
       token: 01234567-89ab-cdef-0123-456789abcdef
+      # (string) An AppRole role ID
+      # role_id: 01234567-89ab-cdef-0123-456789abcdef
+      # (string): An AppRole secret ID
+      # secret_id: s.ImaSecret
 
 # Checks certs of configured URLs by connecting over TCP, attempting a TLS
 #   handshake, and then returning the served certificate
