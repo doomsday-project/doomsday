@@ -107,9 +107,9 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 				err = client.TokenRenewSelf()
 				if err != nil {
 					fmt.Printf("Failed to renew token to Vault: %s\n", err)
+				} else {
+					fmt.Println("Successfully renewed Vault token")
 				}
-
-				fmt.Println("Successfully renewed Vault token")
 			}
 		}()
 	} else {
