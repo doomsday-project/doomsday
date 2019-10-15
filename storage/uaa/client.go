@@ -49,6 +49,7 @@ func (c *Client) do(values url.Values) (*AuthResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Could not authenticate: Status %d", resp.StatusCode)
@@ -68,11 +69,6 @@ func (c *Client) do(values url.Values) (*AuthResponse, error) {
 	}
 
 	_, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	err = resp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
