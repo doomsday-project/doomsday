@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 
@@ -16,15 +17,19 @@ import (
 )
 
 type OmAccessor struct {
-	Client              *http.Client
-	uaaClient           *uaa.Client
-	URL                 *url.URL
-	lock                sync.RWMutex
-	clientID            string
-	clientSecret        string
-	accessToken         string
-	refreshToken        string
-	isClientCredentials bool
+	Client                *http.Client
+	uaaClient             *uaa.Client
+	URL                   *url.URL
+	lock                  sync.RWMutex
+	clientID              string
+	clientSecret          string
+	username              string
+	password              string
+	accessToken           string
+	refreshToken          string
+	isClientCredentials   bool
+	lastSuccessfulRefresh time.Time
+	tokenTTL              time.Duration
 }
 
 type OmConfig struct {
@@ -93,18 +98,24 @@ func newOmAccessor(conf OmConfig) (*OmAccessor, error) {
 	}
 
 	ret := &OmAccessor{
-		Client:              client,
-		clientID:            conf.Auth.ClientID,
-		clientSecret:        conf.Auth.ClientSecret,
-		uaaClient:           uaaClient,
-		accessToken:         authResp.AccessToken,
-		refreshToken:        authResp.RefreshToken,
-		isClientCredentials: isClientCredentials,
-		URL:                 u,
+		Client:                client,
+		clientID:              conf.Auth.ClientID,
+		clientSecret:          conf.Auth.ClientSecret,
+		username:              conf.Auth.Username,
+		password:              conf.Auth.Password,
+		uaaClient:             uaaClient,
+		accessToken:           authResp.AccessToken,
+		refreshToken:          authResp.RefreshToken,
+		isClientCredentials:   isClientCredentials,
+		URL:                   u,
+		lastSuccessfulRefresh: time.Now(),
+		tokenTTL:              authResp.TTL,
 	}
 
+	refreshInterval := authResp.TTL / 2
+	fmt.Fprintf(os.Stderr, "Refreshing Opsman token every %s\n", refreshInterval)
 	go func() {
-		for range time.Tick(authResp.TTL / 2) {
+		for range time.Tick(refreshInterval) {
 			err = ret.refresh()
 			if err != nil {
 				fmt.Printf("Failed to refresh token: %s\n", err)
@@ -207,13 +218,24 @@ func (v *OmAccessor) refresh() error {
 	var authResp *uaa.AuthResponse
 	var err error
 	if v.isClientCredentials {
+		fmt.Fprintf(os.Stderr, "Refreshing client credentials auth for OpsMan\n")
 		authResp, err = v.uaaClient.ClientCredentials(v.clientID, v.clientSecret)
 	} else {
-		authResp, err = v.uaaClient.Refresh(v.clientID, v.clientSecret, v.refreshToken)
+		if time.Since(v.lastSuccessfulRefresh) > v.tokenTTL {
+			fmt.Fprintf(os.Stderr, "Refreshing password auth for OpsMan\n")
+			authResp, err = v.uaaClient.Password(v.clientID, v.clientSecret, v.username, v.password)
+		} else {
+			fmt.Fprintf(os.Stderr, "Refreshing auth using refresh token for Opsman\n")
+			authResp, err = v.uaaClient.Refresh(v.clientID, v.clientSecret, v.refreshToken)
+		}
 	}
 	if err != nil {
 		return err
 	}
+
+	fmt.Fprintf(os.Stderr, "Opsman token refresh was successful\n")
+	v.lastSuccessfulRefresh = time.Now()
+	v.tokenTTL = authResp.TTL
 
 	v.setTokens(authResp.AccessToken, authResp.RefreshToken)
 	return nil

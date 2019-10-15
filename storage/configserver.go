@@ -100,9 +100,9 @@ func newConfigServerAccessor(conf ConfigServerConfig) (*ConfigServerAccessor, er
 
 	c.Auth.(*refreshTokenStrategy).SetTokens(authResp.AccessToken, authResp.RefreshToken)
 
+	refreshInterval := authResp.TTL / 2
+	fmt.Fprintf(os.Stderr, "Refreshing Credhub token every %s\n", refreshInterval)
 	go func() {
-		refreshInterval := authResp.TTL / 2
-		fmt.Fprintf(os.Stderr, "Refreshing Credhub token every %s\n", refreshInterval)
 		for range time.Tick(refreshInterval) {
 			err = c.Auth.(*refreshTokenStrategy).Refresh()
 			if err != nil {
