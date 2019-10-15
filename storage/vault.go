@@ -13,6 +13,11 @@ import (
 	"github.com/cloudfoundry-community/vaultkv"
 )
 
+const (
+	vaultAuthToken = iota
+	vaultAuthApprole
+)
+
 type VaultAccessor struct {
 	client   *vaultkv.KV
 	basePath string
@@ -63,10 +68,13 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 
 	var shouldRenew bool
 	var ttl time.Duration
+	authType := vaultAuthToken
 	if conf.Auth.RoleID != "" || conf.Auth.SecretID != "" {
 		if conf.Auth.Token != "" {
 			return nil, fmt.Errorf("Cannot provide both Token and AppRole authentication methods")
 		}
+
+		authType = vaultAuthApprole
 
 		output, err := client.AuthApprole(conf.Auth.RoleID, conf.Auth.SecretID)
 		if err != nil {
@@ -102,12 +110,28 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 		renewalInterval := ttl / 2
 		fmt.Printf("Renewing Vault token every %s\n", renewalInterval)
 		go func() {
-			for range time.Tick(ttl / 2) {
-				fmt.Println("Attempting to renew Vault token")
-				err = client.TokenRenewSelf()
+			lastSuccessfulRefresh := time.Now()
+
+			for range time.Tick(renewalInterval) {
+				attemptTime := time.Now()
+				var err error
+				if time.Since(lastSuccessfulRefresh) > ttl {
+					if authType == vaultAuthApprole {
+						fmt.Println("Renewing Vault token using AppRole authentication")
+						_, err = client.AuthApprole(conf.Auth.RoleID, conf.Auth.SecretID)
+					} else {
+						fmt.Printf("Token is expired - no way to get new token for Vault. Stopping further renewal attempts.")
+						return
+					}
+				} else {
+					fmt.Println("Renewing Vault token using self-renewal")
+					err = client.TokenRenewSelf()
+				}
+
 				if err != nil {
 					fmt.Printf("Failed to renew token to Vault: %s\n", err)
 				} else {
+					lastSuccessfulRefresh = attemptTime
 					fmt.Println("Successfully renewed Vault token")
 				}
 			}
