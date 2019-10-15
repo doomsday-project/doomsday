@@ -87,14 +87,15 @@ func newConfigServerAccessor(conf ConfigServerConfig) (*ConfigServerAccessor, er
 	)
 
 	c.Auth = &refreshTokenStrategy{
-		ClientID:            conf.Auth.ClientID,
-		ClientSecret:        conf.Auth.ClientSecret,
-		Username:            conf.Auth.Username,
-		Password:            conf.Auth.Password,
-		UAAClient:           &uaaClient,
-		APIClient:           c.Client(),
-		IsClientCredentials: isClientCredentials,
-		TTL:                 authResp.TTL,
+		ClientID:              conf.Auth.ClientID,
+		ClientSecret:          conf.Auth.ClientSecret,
+		Username:              conf.Auth.Username,
+		Password:              conf.Auth.Password,
+		UAAClient:             &uaaClient,
+		APIClient:             c.Client(),
+		IsClientCredentials:   isClientCredentials,
+		lastSuccessfulRefresh: time.Now(),
+		TTL:                   authResp.TTL,
 	}
 
 	c.Auth.(*refreshTokenStrategy).SetTokens(authResp.AccessToken, authResp.RefreshToken)
