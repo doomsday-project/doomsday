@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -62,6 +63,16 @@ func (c *Client) do(values url.Values) (*AuthResponse, error) {
 	r := response{}
 	dec := json.NewDecoder(resp.Body)
 	err = dec.Decode(&r)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	err = resp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
