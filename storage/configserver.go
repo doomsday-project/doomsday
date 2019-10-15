@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -88,15 +89,20 @@ func newConfigServerAccessor(conf ConfigServerConfig) (*ConfigServerAccessor, er
 	c.Auth = &refreshTokenStrategy{
 		ClientID:            conf.Auth.ClientID,
 		ClientSecret:        conf.Auth.ClientSecret,
+		Username:            conf.Auth.Username,
+		Password:            conf.Auth.Password,
 		UAAClient:           &uaaClient,
 		APIClient:           c.Client(),
 		IsClientCredentials: isClientCredentials,
+		TTL:                 authResp.TTL,
 	}
 
 	c.Auth.(*refreshTokenStrategy).SetTokens(authResp.AccessToken, authResp.RefreshToken)
 
 	go func() {
-		for range time.Tick(authResp.TTL / 2) {
+		refreshInterval := authResp.TTL / 2
+		fmt.Fprintf(os.Stderr, "Refreshing Credhub token every %s\n", refreshInterval)
+		for range time.Tick(refreshInterval) {
 			err = c.Auth.(*refreshTokenStrategy).Refresh()
 			if err != nil {
 				fmt.Printf("Could not refresh token: %s", err)
@@ -138,14 +144,18 @@ func (v *ConfigServerAccessor) Get(path string) (map[string]string, error) {
 }
 
 type refreshTokenStrategy struct {
-	lock                sync.RWMutex
-	accessToken         string
-	refreshToken        string
-	ClientID            string
-	ClientSecret        string
-	IsClientCredentials bool
-	UAAClient           *uaa.Client
-	APIClient           *http.Client
+	lock                  sync.RWMutex
+	accessToken           string
+	refreshToken          string
+	lastSuccessfulRefresh time.Time
+	ClientID              string
+	ClientSecret          string
+	Username              string
+	Password              string
+	IsClientCredentials   bool
+	UAAClient             *uaa.Client
+	APIClient             *http.Client
+	TTL                   time.Duration
 }
 
 func (r *refreshTokenStrategy) Do(req *http.Request) (*http.Response, error) {
@@ -169,14 +179,25 @@ func (r *refreshTokenStrategy) Refresh() error {
 	var authResp *uaa.AuthResponse
 	var err error
 	if r.IsClientCredentials {
+		fmt.Fprintf(os.Stderr, "Refreshing client credentials auth for Credhub\n")
 		authResp, err = r.UAAClient.ClientCredentials(r.ClientID, r.ClientSecret)
 	} else {
-		authResp, err = r.UAAClient.Refresh(r.ClientID, r.ClientSecret, r.RefreshToken())
+		if time.Since(r.lastSuccessfulRefresh) > r.TTL {
+			fmt.Fprintf(os.Stderr, "Refreshing password auth for Credhub\n")
+			authResp, err = r.UAAClient.Password(r.ClientID, r.ClientSecret, r.Username, r.Password)
+		} else {
+			fmt.Fprintf(os.Stderr, "Refreshing auth using refresh token for Credhub\n")
+			authResp, err = r.UAAClient.Refresh(r.ClientID, r.ClientSecret, r.RefreshToken())
+		}
 	}
 
 	if err != nil {
 		return err
 	}
+
+	fmt.Fprintf(os.Stderr, "Credhub token refresh was successful\n")
+	r.lastSuccessfulRefresh = time.Now()
+	r.TTL = authResp.TTL
 
 	r.SetTokens(authResp.AccessToken, authResp.RefreshToken)
 
