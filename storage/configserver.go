@@ -44,7 +44,7 @@ func newConfigServerAccessor(conf ConfigServerConfig) (*ConfigServerAccessor, er
 		return nil, fmt.Errorf("Could not get auth endpoint: %s", err)
 	}
 
-	fmt.Printf("AuthURL: %s\n", authURL)
+	//fmt.Printf("AuthURL: %s\n", authURL)
 
 	uaaClient := uaa.Client{
 		URL:               authURL,
@@ -179,6 +179,7 @@ func (r *refreshTokenStrategy) RefreshToken() string {
 func (r *refreshTokenStrategy) Refresh() error {
 	var authResp *uaa.AuthResponse
 	var err error
+	attemptTime := time.Now()
 	if r.IsClientCredentials {
 		fmt.Fprintf(os.Stderr, "Refreshing client credentials auth for Credhub\n")
 		authResp, err = r.UAAClient.ClientCredentials(r.ClientID, r.ClientSecret)
@@ -197,7 +198,7 @@ func (r *refreshTokenStrategy) Refresh() error {
 	}
 
 	fmt.Fprintf(os.Stderr, "Credhub token refresh was successful\n")
-	r.lastSuccessfulRefresh = time.Now()
+	r.lastSuccessfulRefresh = attemptTime
 	r.TTL = authResp.TTL
 
 	r.SetTokens(authResp.AccessToken, authResp.RefreshToken)

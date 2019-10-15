@@ -217,6 +217,7 @@ func (v *OmAccessor) setTokens(accessToken, refreshToken string) {
 func (v *OmAccessor) refresh() error {
 	var authResp *uaa.AuthResponse
 	var err error
+	attemptTime := time.Now()
 	if v.isClientCredentials {
 		fmt.Fprintf(os.Stderr, "Refreshing client credentials auth for OpsMan\n")
 		authResp, err = v.uaaClient.ClientCredentials(v.clientID, v.clientSecret)
@@ -234,7 +235,7 @@ func (v *OmAccessor) refresh() error {
 	}
 
 	fmt.Fprintf(os.Stderr, "Opsman token refresh was successful\n")
-	v.lastSuccessfulRefresh = time.Now()
+	v.lastSuccessfulRefresh = attemptTime
 	v.tokenTTL = authResp.TTL
 
 	v.setTokens(authResp.AccessToken, authResp.RefreshToken)
