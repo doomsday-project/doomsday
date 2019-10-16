@@ -21,12 +21,12 @@ server:
 	GOOS=$(GOOS) GOARCH=amd64 $(BUILD)
 
 darwin:
-	GOOS=darwin OUTPUT_NAME=$(APP_NAME)-darwin VERSION="$(VERSION)" $(MAKE)
+	GOOS=darwin OUTPUT_NAME=$(APP_NAME)-darwin VERSION="$(VERSION)" $(MAKE) server
 
 linux:
-	GOOS=linux OUTPUT_NAME=$(APP_NAME)-linux VERSION="$(VERSION)" $(MAKE)
+	GOOS=linux OUTPUT_NAME=$(APP_NAME)-linux VERSION="$(VERSION)" $(MAKE) server
 
-all: darwin linux
+all: embed darwin linux
 
 embed:
 	GOOS="" GOARCH="" go run web/embed/main.go web/embed/mappings.yml
