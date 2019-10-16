@@ -29,6 +29,10 @@ backends:
     # (string) This is the path to begin looking for Vault secrets. Everything under this
     # path will be searched. Defaults to "secret/" if not present.
     base_path: "secret/"
+    # (boolean) If set to true, requests to and responses from the Vault will
+    # be logged to stdout. You probably only want this if you're debugging.
+    #trace: true
+    #
     # (hash) Options for authorizing to Vault
     # Must either provide "token" for Token auth or "role_id" and "secret_id" for AppRole
     # If a token is given, it should either have no expiry or be renewable.

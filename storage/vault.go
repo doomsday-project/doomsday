@@ -3,8 +3,10 @@ package storage
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"runtime"
 	"strings"
@@ -27,6 +29,7 @@ type VaultConfig struct {
 	Address            string `yaml:"address"`
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
 	BasePath           string `yaml:"base_path"`
+	Trace              bool   `yaml:"trace"`
 	Auth               struct {
 		Token    string `yaml:"token"`
 		RoleID   string `yaml:"role_id"`
@@ -52,6 +55,12 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 		conf.BasePath = "secret/"
 	}
 
+	var tracer io.Writer
+	if conf.Trace {
+		//I'm already tracer
+		tracer = os.Stdout
+	}
+
 	client := &vaultkv.Client{
 		VaultURL:  u,
 		AuthToken: conf.Auth.Token,
@@ -63,7 +72,7 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 				MaxIdleConnsPerHost: runtime.NumCPU(),
 			},
 		},
-		//Trace: os.Stdout,
+		Trace: tracer,
 	}
 
 	var shouldRenew bool
