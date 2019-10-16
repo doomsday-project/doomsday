@@ -166,6 +166,16 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 func (v *VaultAccessor) Get(path string) (map[string]string, error) {
 	ret := make(map[string]string)
 	_, err := v.client.Get(path, &ret, nil)
+	if err != nil {
+		//This might be worth checking to see if
+		// 1. The mount is v2
+		// 2. The secret metadata exists
+		// 3. The latest version is deleted
+		// But for now, if we listed it, this is probably why we'd get a 404.
+		if vaultkv.IsNotFound(err) {
+			err = nil
+		}
+	}
 	return ret, err
 }
 
