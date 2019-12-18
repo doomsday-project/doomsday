@@ -33,6 +33,15 @@ func newTLSClientAccessor(conf TLSClientConfig) (*TLSClientAccessor, error) {
 	return ret, nil
 }
 
+func (t *TLSClientAccessor) List() (PathList, error) {
+	ret := make(PathList, 0, len(t.hosts))
+	for _, host := range t.hosts {
+		ret = append(ret, host)
+	}
+
+	return ret, nil
+}
+
 func (t *TLSClientAccessor) Get(path string) (map[string]string, error) {
 	u, err := url.Parse(path)
 	if err != nil {
@@ -67,11 +76,6 @@ func (t *TLSClientAccessor) Get(path string) (map[string]string, error) {
 	return ret, nil
 }
 
-func (t *TLSClientAccessor) List() (PathList, error) {
-	ret := make(PathList, 0, len(t.hosts))
-	for _, host := range t.hosts {
-		ret = append(ret, host)
-	}
-
-	return ret, nil
+func (t *TLSClientAccessor) Authenticate(_ bool) (TokenTTL, error) {
+	return TokenTTL{TTL: TTLInfinite}, nil
 }

@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -10,6 +11,11 @@ import (
 type Accessor interface {
 	List() (PathList, error)
 	Get(path string) (map[string]string, error)
+	//Authenticate receives if existing token is still valid, according to the
+	//TTL returned by the previous authentication attempt.  It should return the
+	//new TTL. Authenticate must be called at some point before any calls to List
+	//or Get.
+	Authenticate(shouldRefresh bool) (TokenTTL, error)
 }
 
 const (
@@ -18,6 +24,23 @@ const (
 	typeOpsman
 	typeCredhub
 	typeTLS
+)
+
+type TokenTTL struct {
+	//TTL is how much longer the token is valid for
+	TTL time.Duration
+	//Refreshable returns if the token should be refreshed. This is used
+	// to calculate the shouldRefresh variable passed into Authenticate
+	Refreshable bool
+	//Last, if true, will cause the scheduler to not attempt any further
+	//authentication calls.
+	Last bool
+}
+
+const (
+	TTLUnknown time.Duration = 0
+	//TTLInfinite, if auth succeeds, means that no further renewal is necessary, as the auth will last forever
+	TTLInfinite = time.Duration(0x7FFFFFFFFFFFFFFF)
 )
 
 func NewAccessor(accessorType string, conf map[string]interface{}) (Accessor, error) {

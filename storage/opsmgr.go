@@ -17,19 +17,17 @@ import (
 )
 
 type OmAccessor struct {
-	Client                *http.Client
-	uaaClient             *uaa.Client
-	URL                   *url.URL
-	lock                  sync.RWMutex
-	clientID              string
-	clientSecret          string
-	username              string
-	password              string
-	accessToken           string
-	refreshToken          string
-	isClientCredentials   bool
-	lastSuccessfulRefresh time.Time
-	tokenTTL              time.Duration
+	client       *http.Client
+	uaaClient    *uaa.Client
+	url          *url.URL
+	lock         sync.RWMutex
+	clientID     string
+	clientSecret string
+	username     string
+	password     string
+	accessToken  string
+	refreshToken string
+	authType     uint64
 }
 
 type OmConfig struct {
@@ -70,58 +68,34 @@ func newOmAccessor(conf OmConfig) (*OmAccessor, error) {
 	}
 
 	var client = newOmClient(conf)
-	var authResp *uaa.AuthResponse
 	var uaaClient = &uaa.Client{
 		URL:               fmt.Sprintf("%s/uaa/oauth/token", u.String()),
 		SkipTLSValidation: conf.InsecureSkipVerify,
 	}
 
-	var isClientCredentials bool
+	var authType uint64
 
 	switch conf.Auth.GrantType {
 	case "client_credentials", "client credentials", "clientcredentials":
-		isClientCredentials = true
-		authResp, err = uaaClient.ClientCredentials(
-			conf.Auth.ClientID,
-			conf.Auth.ClientSecret,
-		)
+		authType = uaa.AuthClientCredentials
 	case "resource_owner", "resource owner", "resourceowner", "password":
-		authResp, err = uaaClient.Password(
-			conf.Auth.ClientID,
-			conf.Auth.ClientSecret,
-			conf.Auth.Username,
-			conf.Auth.Password,
-		)
-	}
-	if err != nil {
-		return nil, err
+		authType = uaa.AuthPassword
+	default:
+		return nil, fmt.Errorf("Unknown auth grant_type `%s'", conf.Auth.GrantType)
 	}
 
 	ret := &OmAccessor{
-		Client:                client,
-		clientID:              conf.Auth.ClientID,
-		clientSecret:          conf.Auth.ClientSecret,
-		username:              conf.Auth.Username,
-		password:              conf.Auth.Password,
-		uaaClient:             uaaClient,
-		accessToken:           authResp.AccessToken,
-		refreshToken:          authResp.RefreshToken,
-		isClientCredentials:   isClientCredentials,
-		URL:                   u,
-		lastSuccessfulRefresh: time.Now(),
-		tokenTTL:              authResp.TTL,
+		url:          u,
+		uaaClient:    uaaClient,
+		client:       client,
+		clientID:     conf.Auth.ClientID,
+		clientSecret: conf.Auth.ClientSecret,
+		username:     conf.Auth.Username,
+		password:     conf.Auth.Password,
+		accessToken:  authResp.AccessToken,
+		refreshToken: authResp.RefreshToken,
+		authType:     authType,
 	}
-
-	refreshInterval := authResp.TTL / 2
-	fmt.Fprintf(os.Stderr, "Refreshing Opsman token every %s\n", refreshInterval)
-	go func() {
-		for range time.Tick(refreshInterval) {
-			err = ret.refresh()
-			if err != nil {
-				fmt.Printf("Failed to refresh token: %s\n", err)
-			}
-		}
-	}()
 
 	return ret, nil
 }
@@ -214,32 +188,43 @@ func (v *OmAccessor) setTokens(accessToken, refreshToken string) {
 	v.refreshToken = refreshToken
 }
 
-func (v *OmAccessor) refresh() error {
+func (v *OmAccessor) getRefreshToken() string {
+	v.lock.Lock()
+	ret = v.refreshToken
+	v.lock.Unlock()
+	return ret
+}
+
+func (v *OmAccessor) Authenticate(shouldRefresh bool) (TokenTTL, error) {
 	var authResp *uaa.AuthResponse
 	var err error
-	attemptTime := time.Now()
-	if v.isClientCredentials {
-		fmt.Fprintf(os.Stderr, "Refreshing client credentials auth for OpsMan\n")
+	var refreshable bool
+
+	switch v.authType {
+	case uaa.AuthClientCredentials:
+		fmt.Fprintf(os.Stderr, "Performing client credentials auth for Ops Manager\n")
 		authResp, err = v.uaaClient.ClientCredentials(v.clientID, v.clientSecret)
-	} else {
-		if time.Since(v.lastSuccessfulRefresh) > v.tokenTTL {
-			fmt.Fprintf(os.Stderr, "Refreshing password auth for OpsMan\n")
-			authResp, err = v.uaaClient.Password(v.clientID, v.clientSecret, v.username, v.password)
+
+	case uaa.AuthPassword:
+		if shouldRefresh {
+			fmt.Fprintf(os.Stderr, "Refreshing auth using refresh token for Ops Manager\n")
+			authResp, err = v.uaaClient.Refresh(v.clientID, v.clientSecret, v.getRefreshToken())
 		} else {
-			fmt.Fprintf(os.Stderr, "Refreshing auth using refresh token for Opsman\n")
-			authResp, err = v.uaaClient.Refresh(v.clientID, v.clientSecret, v.refreshToken)
+			fmt.Fprintf(os.Stderr, "Performing password auth for Ops Manager\n")
+			authResp, err = v.uaaClient.Password(v.clientID, v.clientSecret, v.username, v.password)
 		}
+		refreshable = true
+
+	default:
+		panic("Unknown authType set in configServerAccessor")
 	}
 	if err != nil {
-		return err
+		return TokenTTL{TTL: TTLUnknown}, err
 	}
 
-	fmt.Fprintf(os.Stderr, "Opsman token refresh was successful\n")
-	v.lastSuccessfulRefresh = attemptTime
-	v.tokenTTL = authResp.TTL
+	v.setTokens(authResp.accessToken, authResp.refreshToken)
 
-	v.setTokens(authResp.AccessToken, authResp.RefreshToken)
-	return nil
+	return TokenTTL{TTL: authResp.TTL, Refreshable: refreshable}, nil
 }
 
 func (v *OmAccessor) opsmanAPI(path string) ([]byte, error) {

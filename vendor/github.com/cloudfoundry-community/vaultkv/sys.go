@@ -3,6 +3,7 @@ package vaultkv
 import (
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"net/url"
 	"strings"
 )
@@ -214,6 +215,11 @@ func (v *Client) Health(standbyok bool) error {
 	if err != nil {
 		return err
 	}
+	_, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
 	errorMessage := strings.Join(errorsStruct.Errors, "\n")
 
 	switch resp.StatusCode {
