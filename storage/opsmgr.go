@@ -42,6 +42,10 @@ type OmConfig struct {
 	} `yaml:"auth"`
 }
 
+type omAuthMetadata struct {
+	renewalDeadline time.Time
+}
+
 func newOmClient(conf OmConfig) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
@@ -57,10 +61,11 @@ func newOmClient(conf OmConfig) *http.Client {
 	}
 }
 
-func newOmAccessor(conf OmConfig) (*OmAccessor, error) {
+func newOmAccessor(conf OmConfig) (*OmAccessor, omAuthMetadata, error) {
+	metadata := omAuthMetadata{}
 	u, err := url.Parse(conf.Address)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse target url: %s", err)
+		return nil, metadata, fmt.Errorf("could not parse target url: %s", err)
 	}
 
 	if u.Scheme == "" {
@@ -81,7 +86,7 @@ func newOmAccessor(conf OmConfig) (*OmAccessor, error) {
 	case "resource_owner", "resource owner", "resourceowner", "password":
 		authType = uaa.AuthPassword
 	default:
-		return nil, fmt.Errorf("Unknown auth grant_type `%s'", conf.Auth.GrantType)
+		return nil, metadata, fmt.Errorf("Unknown auth grant_type `%s'", conf.Auth.GrantType)
 	}
 
 	ret := &OmAccessor{
@@ -92,12 +97,10 @@ func newOmAccessor(conf OmConfig) (*OmAccessor, error) {
 		clientSecret: conf.Auth.ClientSecret,
 		username:     conf.Auth.Username,
 		password:     conf.Auth.Password,
-		accessToken:  authResp.AccessToken,
-		refreshToken: authResp.RefreshToken,
 		authType:     authType,
 	}
 
-	return ret, nil
+	return ret, metadata, nil
 }
 
 //Get attempts to get the secret stored at the requested backend path and
@@ -190,15 +193,15 @@ func (v *OmAccessor) setTokens(accessToken, refreshToken string) {
 
 func (v *OmAccessor) getRefreshToken() string {
 	v.lock.Lock()
-	ret = v.refreshToken
+	ret := v.refreshToken
 	v.lock.Unlock()
 	return ret
 }
 
-func (v *OmAccessor) Authenticate(shouldRefresh bool) (TokenTTL, error) {
+func (v *OmAccessor) Authenticate(last interface{}) (time.Duration, interface{}, error) {
 	var authResp *uaa.AuthResponse
 	var err error
-	var refreshable bool
+	metadata := last.(omAuthMetadata)
 
 	switch v.authType {
 	case uaa.AuthClientCredentials:
@@ -206,29 +209,35 @@ func (v *OmAccessor) Authenticate(shouldRefresh bool) (TokenTTL, error) {
 		authResp, err = v.uaaClient.ClientCredentials(v.clientID, v.clientSecret)
 
 	case uaa.AuthPassword:
-		if shouldRefresh {
+		attemptTime := time.Now()
+		//The one second buffer is just so that we reduce the chance that we try
+		// to renew the token just as the token is becoming unrenewable (and therefore err)
+		if attemptTime.Add(1 * time.Second).Before(metadata.renewalDeadline) {
 			fmt.Fprintf(os.Stderr, "Refreshing auth using refresh token for Ops Manager\n")
 			authResp, err = v.uaaClient.Refresh(v.clientID, v.clientSecret, v.getRefreshToken())
 		} else {
 			fmt.Fprintf(os.Stderr, "Performing password auth for Ops Manager\n")
 			authResp, err = v.uaaClient.Password(v.clientID, v.clientSecret, v.username, v.password)
 		}
-		refreshable = true
+
+		if err == nil {
+			metadata.renewalDeadline = attemptTime.Add(authResp.TTL)
+		}
 
 	default:
 		panic("Unknown authType set in configServerAccessor")
 	}
 	if err != nil {
-		return TokenTTL{TTL: TTLUnknown}, err
+		return TTLUnknown, metadata, err
 	}
 
-	v.setTokens(authResp.accessToken, authResp.refreshToken)
+	v.setTokens(authResp.AccessToken, authResp.RefreshToken)
 
-	return TokenTTL{TTL: authResp.TTL, Refreshable: refreshable}, nil
+	return authResp.TTL, metadata, nil
 }
 
 func (v *OmAccessor) opsmanAPI(path string) ([]byte, error) {
-	u := *v.URL
+	u := *v.url
 	u.Path = fmt.Sprintf("%s%s", u.Path, path)
 
 	req, err := http.NewRequest("GET", u.String(), nil)
@@ -240,7 +249,7 @@ func (v *OmAccessor) opsmanAPI(path string) ([]byte, error) {
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", v.accessToken))
 	v.lock.RUnlock()
 
-	resp, err := v.Client.Do(req)
+	resp, err := v.client.Do(req)
 	if err != nil {
 		return []byte{}, fmt.Errorf("could not make api request to credentials endpoint: %s", err)
 	}

@@ -11,11 +11,12 @@ import (
 type Accessor interface {
 	List() (PathList, error)
 	Get(path string) (map[string]string, error)
-	//Authenticate receives if existing token is still valid, according to the
-	//TTL returned by the previous authentication attempt.  It should return the
-	//new TTL. Authenticate must be called at some point before any calls to List
-	//or Get.
-	Authenticate(shouldRefresh bool) (TokenTTL, error)
+	//Authenticate receives metadata returned from the last run of a call to
+	//authenticate. It is guaranteed to receive the value that was returned by
+	//its constructor on the first run. It should return the new TTL, any
+	//metadata to send to the next run, and an error if one occurred.
+	//Authenticate must be called at some point before any calls to List or Get.
+	Authenticate(last interface{}) (TTL time.Duration, nextMetadata interface{}, err error)
 }
 
 const (
@@ -26,24 +27,21 @@ const (
 	typeTLS
 )
 
-type TokenTTL struct {
-	//TTL is how much longer the token is valid for
-	TTL time.Duration
-	//Refreshable returns if the token should be refreshed. This is used
-	// to calculate the shouldRefresh variable passed into Authenticate
-	Refreshable bool
-	//Last, if true, will cause the scheduler to not attempt any further
-	//authentication calls.
-	Last bool
-}
-
 const (
 	TTLUnknown time.Duration = 0
-	//TTLInfinite, if auth succeeds, means that no further renewal is necessary, as the auth will last forever
+	//TTLInfinite means that no further renewal is necessary, as the auth will
+	//last forever
 	TTLInfinite = time.Duration(0x7FFFFFFFFFFFFFFF)
 )
 
-func NewAccessor(accessorType string, conf map[string]interface{}) (Accessor, error) {
+//NewAccessor generates an accessor of the provided type, configured with the
+//provided configuration object. returns the Accessor, the struct to be passed
+//to the accessor's first auth call, and an error if one occurred.
+func NewAccessor(accessorType string, conf map[string]interface{}) (
+	Accessor,
+	interface{},
+	error,
+) {
 	properties, err := yaml.Marshal(&conf)
 	if err != nil {
 		panic("Could not re-marshal into YAML")
@@ -51,7 +49,7 @@ func NewAccessor(accessorType string, conf map[string]interface{}) (Accessor, er
 
 	t := resolveType(strings.ToLower(accessorType))
 	if t == typeUnknown {
-		return nil, fmt.Errorf("Unrecognized backend type (%s)", accessorType)
+		return nil, nil, fmt.Errorf("Unrecognized backend type (%s)", accessorType)
 	}
 
 	var c interface{}
@@ -76,18 +74,19 @@ func NewAccessor(accessorType string, conf map[string]interface{}) (Accessor, er
 	}
 
 	var backend Accessor
+	var firstAuth interface{}
 	switch t {
 	case typeVault:
-		backend, err = newVaultAccessor(*c.(*VaultConfig))
+		backend, firstAuth, err = newVaultAccessor(*c.(*VaultConfig))
 	case typeOpsman:
-		backend, err = newOmAccessor(*c.(*OmConfig))
+		backend, firstAuth, err = newOmAccessor(*c.(*OmConfig))
 	case typeCredhub:
-		backend, err = newConfigServerAccessor(*c.(*ConfigServerConfig))
+		backend, firstAuth, err = newConfigServerAccessor(*c.(*ConfigServerConfig))
 	case typeTLS:
-		backend, err = newTLSClientAccessor(*c.(*TLSClientConfig))
+		backend, firstAuth, err = newTLSClientAccessor(*c.(*TLSClientConfig))
 	}
 
-	return backend, err
+	return backend, firstAuth, err
 }
 
 func resolveType(t string) int {

@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
-	"github.com/cloudfoundry-incubator/credhub-cli/credhub"
+	"code.cloudfoundry.org/credhub-cli/credhub"
 	"github.com/doomsday-project/doomsday/storage/uaa"
 )
 
@@ -32,19 +33,28 @@ type ConfigServerConfig struct {
 	} `yaml:"auth"`
 }
 
-func newConfigServerAccessor(conf ConfigServerConfig) (*ConfigServerAccessor, error) {
+type configServerAuthMetadata struct {
+	renewalDeadline time.Time
+}
+
+func newConfigServerAccessor(conf ConfigServerConfig) (
+	*ConfigServerAccessor,
+	configServerAuthMetadata,
+	error,
+) {
+	metadata := configServerAuthMetadata{}
 	c, err := credhub.New(
 		conf.Address,
 		credhub.SkipTLSValidation(conf.InsecureSkipVerify),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("Could not create config server client: %s", err)
+		return nil, metadata, fmt.Errorf("Could not create config server client: %s", err)
 	}
 	c.Auth = &refreshTokenStrategy{APIClient: c.Client()}
 
 	authURL, err := c.AuthURL()
 	if err != nil {
-		return nil, fmt.Errorf("Could not get auth endpoint: %s", err)
+		return nil, metadata, fmt.Errorf("Could not get auth endpoint: %s", err)
 	}
 
 	var authType uint64
@@ -55,14 +65,14 @@ func newConfigServerAccessor(conf ConfigServerConfig) (*ConfigServerAccessor, er
 	case "resource_owner", "resource owner", "resourceowner", "password":
 		authType = uaa.AuthPassword
 	case "none", "noop":
-		authType = uaa.AuthTypeNoop
+		authType = uaa.AuthNoop
 	default:
-		return nil, fmt.Errorf("Unknown auth grant_type `%s'", conf.Auth.GrantType)
+		return nil, metadata, fmt.Errorf("Unknown auth grant_type `%s'", conf.Auth.GrantType)
 	}
 
 	ret := &ConfigServerAccessor{
 		credhub: c,
-		uaaClient: uaa.Client{
+		uaaClient: &uaa.Client{
 			URL:               authURL,
 			SkipTLSValidation: conf.InsecureSkipVerify,
 		},
@@ -73,7 +83,7 @@ func newConfigServerAccessor(conf ConfigServerConfig) (*ConfigServerAccessor, er
 		password:     conf.Auth.Password,
 	}
 
-	return ret, nil
+	return ret, metadata, nil
 }
 
 //List attempts to get all of the paths in the config server
@@ -106,43 +116,48 @@ func (v *ConfigServerAccessor) Get(path string) (map[string]string, error) {
 	return nil, nil
 }
 
-func (v *ConfigServerAccessor) Authenticate(shouldRefresh bool) (TokenTTL, error) {
+func (v *ConfigServerAccessor) Authenticate(last interface{}) (
+	TTL time.Duration,
+	next interface{},
+	err error,
+) {
 	var authResp *uaa.AuthResponse
-	var err error
-	var refreshable bool
+	metadata := last.(configServerAuthMetadata)
 
 	switch v.authType {
 	case uaa.AuthNoop:
-		return &TokenTTL{
-			TTL: TTLInfinite, 
-			Last: true
-		}, nil
+		return TTLInfinite, metadata, nil
 
 	case uaa.AuthClientCredentials:
 		fmt.Fprintf(os.Stderr, "Performing client credentials auth for Credhub\n")
 		authResp, err = v.uaaClient.ClientCredentials(v.clientID, v.clientSecret)
 
 	case uaa.AuthPassword:
-		if shouldRefresh {
+		attemptTime := time.Now()
+		//The one second buffer is just so that we reduce the chance that we try
+		// to renew the token just as the token is becoming unrenewable (and therefore err)
+		if attemptTime.Add(1 * time.Second).Before(metadata.renewalDeadline) {
 			fmt.Fprintf(os.Stderr, "Refreshing auth using refresh token for Credhub\n")
-			authResp, err = v.uaaClient.Refresh(v.clientID, v.clientSecret, v.credhub.Auth.(refreshTokenStrategy).RefreshToken())
+			authResp, err = v.uaaClient.Refresh(v.clientID, v.clientSecret, v.credhub.Auth.(*refreshTokenStrategy).RefreshToken())
 		} else {
 			fmt.Fprintf(os.Stderr, "Performing password auth for Credhub\n")
 			authResp, err = v.uaaClient.Password(v.clientID, v.clientSecret, v.username, v.password)
 		}
 
-		refreshable = true
+		if err == nil {
+			metadata.renewalDeadline = attemptTime.Add(authResp.TTL)
+		}
 
 	default:
 		panic("Unknown authType set in configServerAccessor")
 	}
 	if err != nil {
-		return TokenTTL{TTL: TTLUnknown}, err
+		return TTLUnknown, metadata, err
 	}
 
-	v.credhub.Auth.(refreshTokenStrategy).SetTokens(authResp.AccessToken, authResp.RefreshToken)
+	v.credhub.Auth.(*refreshTokenStrategy).SetTokens(authResp.AccessToken, authResp.RefreshToken)
 
-	return &TokenTTL{TTL: authResp.TTL, Refreshable: refreshable}, nil
+	return authResp.TTL, metadata, nil
 }
 
 type refreshTokenStrategy struct {

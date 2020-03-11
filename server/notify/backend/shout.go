@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"time"
 
-	shout "github.com/thomasmmitchell/go-shout"
+	shout "github.com/thomasmitchell/go-shout"
 )
 
 type ShoutConfig struct {
