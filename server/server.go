@@ -47,7 +47,7 @@ func Start(conf Config) error {
 		}
 
 		log.WriteF("Configuring backend `%s' of type `%s'", b.Name, b.Type)
-		thisBackend, err := storage.NewAccessor(b.Type, b.Properties)
+		thisBackend, authState, err := storage.NewAccessor(b.Type, b.Properties)
 		if err != nil {
 			return fmt.Errorf("Error configuring backend `%s': %s", b.Name, err)
 		}
@@ -57,13 +57,17 @@ func Start(conf Config) error {
 
 		sources = append(sources,
 			Source{
-				Core:     &thisCore,
-				Interval: time.Duration(b.RefreshInterval) * time.Minute,
+				Core:         &thisCore,
+				Interval:     time.Duration(b.RefreshInterval) * time.Minute,
+				authMetadata: authState,
 			},
 		)
 	}
 
 	manager := NewSourceManager(sources, log)
+
+	log.WriteF("Starting background scheduler")
+
 	manager.BackgroundScheduler()
 
 	log.WriteF("Began asynchronous cache population")

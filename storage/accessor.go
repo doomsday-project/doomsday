@@ -70,7 +70,7 @@ func NewAccessor(accessorType string, conf map[string]interface{}) (
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("Error when parsing backend config: %s", err)
+		return nil, nil, fmt.Errorf("Error when parsing backend config: %s", err)
 	}
 
 	var backend Accessor

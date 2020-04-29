@@ -160,74 +160,59 @@ func (v *VaultAccessor) Authenticate(last interface{}) (
 	interface{},
 	error,
 ) {
-	//TODO: Doooooo thiissssss
+	lastMetadata := last.(vaultAuthMetadata)
+	shouldRefresh := time.Now().Before(lastMetadata.renewalDeadline)
 	var (
-		ret TokenTTL
+		ttl time.Duration
 		err error
 	)
 
+	start := time.Now()
+
 	switch v.authType {
 	case vaultAuthToken:
-		ret, err = v.authToken(shouldRefresh)
+		ttl, err = v.authToken()
 
 	case vaultAuthApprole:
 		if shouldRefresh {
-			ret, err = v.authToken(true)
+			ttl, err = v.authToken()
 		} else {
-			ret, err = v.authApprole(shouldRefresh)
+			ttl, err = v.authApprole()
 		}
 	}
+	if err != nil {
+		return TTLUnknown, last, err
+	}
 
-	return ret, err
+	return ttl, vaultAuthMetadata{renewalDeadline: start.Add(ttl)}, nil
 }
 
-func (v *VaultAccessor) authToken(shouldRefresh bool) (TokenTTL, error) {
+func (v *VaultAccessor) authToken() (ttl time.Duration, err error) {
+	err = v.client.Client.TokenRenewSelf()
+	if err != nil {
+		err = fmt.Errorf("Could not renew token: %s", err)
+		return
+	}
+
 	info, err := v.client.Client.TokenInfoSelf()
 	if err != nil {
-		return TokenTTL{}, fmt.Errorf("Error looking up token information: %s", err)
+		err = fmt.Errorf("Error looking up token information after auth: %s", err)
+		return
 	}
 
-	var ttl time.Duration
-	if info.ExpireTime.IsZero() {
-		//Likely a root token
-		ttl = TTLInfinite
-	} else {
-		ttl = time.Until(info.ExpireTime)
-	}
-
-	if ttl <= 0 {
-		return TokenTTL{Last: true},
-			fmt.Errorf("Token is expired")
-	}
-
-	//Is it a renewable token?
-	if info.Renewable {
-		//If so, renew it.
-		err = v.client.Client.TokenRenewSelf()
-		if err != nil {
-			return TokenTTL{}, fmt.Errorf("Could not renew token: %s", err)
-		}
-		info, err := v.client.Client.TokenInfoSelf()
-		if err != nil {
-			return TokenTTL{}, fmt.Errorf("Error looking up token information after auth: %s", err)
-		}
-		return TokenTTL{TTL: info.TTL, Refreshable: info.Renewable}, nil
-	}
-
-	//If token is NOT renewable, say how much time is left
-	return TokenTTL{TTL: ttl, Refreshable: false, Last: true}, nil
+	ttl = info.TTL
+	return
 }
 
-func (v *VaultAccessor) authApprole(shouldRenew bool) (TokenTTL, error) {
+func (v *VaultAccessor) authApprole() (ttl time.Duration, err error) {
 	output, err := v.client.Client.AuthApprole(v.roleID, v.secretID)
 	if err != nil {
-		return TokenTTL{}, fmt.Errorf("Error performing AppRole authentication: %s", err)
+		err = fmt.Errorf("Error performing AppRole authentication: %s", err)
+		return
 	}
 
-	return TokenTTL{
-		TTL:         output.LeaseDuration,
-		Refreshable: output.Renewable,
-	}, nil
+	ttl = output.LeaseDuration
+	return
 }
 
 func canonizePath(path string) string {
