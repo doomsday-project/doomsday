@@ -4,23 +4,45 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/doomsday-project/doomsday/server/logger"
 )
 
+type taskKind uint
+
 const (
-	queueTaskKindAuth uint = iota
+	queueTaskKindAuth taskKind = iota
 	queueTaskKindRefresh
 )
 
+func (t taskKind) String() string {
+	if t == queueTaskKindAuth {
+		return "authentication"
+	}
+
+	return "refresh"
+}
+
+type runReason uint
+
 const (
-	runReasonSchedule uint = iota
+	runReasonSchedule runReason = iota
 	runReasonAdhoc
 )
 
+func (r runReason) String() string {
+	if r == runReasonSchedule {
+		return "scheduled"
+	}
+
+	return "adhoc"
+}
+
 type managerTask struct {
-	kind    uint
+	kind    taskKind
 	source  *Source
 	runTime time.Time
-	reason  uint
+	reason  runReason
 	ready   bool
 }
 
@@ -29,16 +51,19 @@ func (m *managerTask) durationUntil() time.Duration {
 }
 
 type taskQueue struct {
-	data []managerTask
-	lock *sync.Mutex
-	cond *sync.Cond
+	data        []managerTask
+	lock        *sync.Mutex
+	cond        *sync.Cond
+	log         *logger.Logger
+	globalCache *Cache
 }
 
-func newTaskQueue() *taskQueue {
+func newTaskQueue(cache *Cache) *taskQueue {
 	lock := &sync.Mutex{}
 	return &taskQueue{
-		lock: lock,
-		cond: sync.NewCond(lock),
+		lock:        lock,
+		cond:        sync.NewCond(lock),
+		globalCache: cache,
 	}
 }
 
@@ -88,7 +113,7 @@ func (t *taskQueue) sort() {
 	})
 }
 
-func (t *taskQueue) removeExistingNoLock(source *Source, taskType uint) {
+func (t *taskQueue) removeExistingNoLock(source *Source, taskType taskKind) {
 	//A source is considered equal if it has the same pointer to a core
 	for i := range t.data {
 		if t.data[i].source.Core == source.Core &&
@@ -103,4 +128,43 @@ func (t *taskQueue) removeExistingNoLock(source *Source, taskType uint) {
 
 func (t *taskQueue) empty() bool {
 	return len(t.data) == 0
+}
+
+func (t *taskQueue) start() {
+	go func() {
+		for {
+			t.run(t.next())
+		}
+	}()
+}
+
+func (t *taskQueue) run(task managerTask) {
+	var nextTime time.Time
+	var skipSched bool
+	switch task.kind {
+	case queueTaskKindAuth:
+		log.WriteF("Starting authentication for `%s'", task.source.Core.Name)
+		task.source.Auth(t.log)
+		nextTime, skipSched = task.source.CalcNextAuth()
+
+	case queueTaskKindRefresh:
+		t.log.WriteF("Running %s populate of `%s'", task.reason.String(), task.source.Core.Name)
+		task.source.Refresh(t.globalCache, t.log)
+		nextTime = task.source.CalcNextRefresh()
+	}
+
+	if skipSched {
+		t.log.WriteF("Skipping further scheduling of `%s' for `%s'", task.kind.String(), task.source.Core.Name)
+		return
+	}
+
+	task.runTime = nextTime
+	task.reason = runReasonSchedule
+
+	t.enqueue(managerTask{
+		source:  task.source,
+		runTime: nextTime,
+		reason:  runReasonSchedule,
+		kind:    task.kind,
+	})
 }

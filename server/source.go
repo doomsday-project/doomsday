@@ -31,8 +31,7 @@ type RunTiming struct {
 }
 
 //TODO: clean up the mode argument
-func (s *Source) Refresh(global *Cache, mode string, log *logger.Logger) {
-	log.WriteF("Running %s populate of `%s'", mode, s.Core.Name)
+func (s *Source) Refresh(global *Cache, log *logger.Logger) {
 	old := s.Core.Cache()
 	if old == nil {
 		old = NewCache()
@@ -60,12 +59,10 @@ func (s *Source) Refresh(global *Cache, mode string, log *logger.Logger) {
 
 	global.ApplyDiff(old, s.Core.Cache())
 
-	log.WriteF("Finished %s populate of `%s' after %s. %d/%d paths searched. %d certs found",
-		mode, s.Core.Name, time.Since(s.refreshStatus.LastRun.StartedAt), results.NumSuccess, results.NumPaths, results.NumCerts)
+	log.WriteF("Finished populate of `%s' after %s. %d/%d paths searched. %d certs found", s.Core.Name, time.Since(s.refreshStatus.LastRun.StartedAt), results.NumSuccess, results.NumPaths, results.NumCerts)
 }
 
 func (s *Source) Auth(log *logger.Logger) {
-	log.WriteF("Starting authentication for `%s'", s.Core.Name)
 
 	s.lock.Lock()
 	s.authStatus.LastRun = RunTiming{StartedAt: time.Now()}

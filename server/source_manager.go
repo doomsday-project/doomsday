@@ -33,8 +33,10 @@ func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
 		panic("No logger was given")
 	}
 
-	queue := newTaskQueue()
 	now := time.Now()
+	globalCache := NewCache()
+	queue := newTaskQueue(globalCache)
+
 	for i := range sources {
 		queue.enqueue(managerTask{
 			kind:    queueTaskKindAuth,
@@ -48,20 +50,12 @@ func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
 		sources: sources,
 		queue:   queue,
 		log:     log,
-		global:  NewCache(),
+		global:  globalCache,
 	}
 }
 
 func (s *SourceManager) BackgroundScheduler() {
-	//TODO: Seed the queue
-
-	go func() {
-		for {
-			current := s.queue.next()
-			//TODO: Remember to push off schedule if an ad-hoc has been run in the meantime
-			current.source.Refresh(s.global, "scheduled", s.log)
-		}
-	}()
+	s.queue.start()
 }
 
 func (s *SourceManager) Data() doomsday.CacheItems {
