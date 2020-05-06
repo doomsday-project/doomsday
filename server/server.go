@@ -192,10 +192,11 @@ func getScheduler(manager *SourceManager) func(w http.ResponseWriter, r *http.Re
 
 		for i := range schedData.Tasks {
 			respRaw.Tasks = append(respRaw.Tasks, doomsday.GetSchedulerTask{
-				At:     schedData.Tasks[i].At.Unix(),
-				Reason: schedData.Tasks[i].Reason,
-				Kind:   schedData.Tasks[i].Kind,
-				Ready:  schedData.Tasks[i].Ready,
+				At:      schedData.Tasks[i].At.Unix(),
+				Backend: schedData.Tasks[i].Backend,
+				Reason:  schedData.Tasks[i].Reason,
+				Kind:    schedData.Tasks[i].Kind,
+				Ready:   schedData.Tasks[i].Ready,
 			})
 		}
 

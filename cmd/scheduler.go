@@ -29,7 +29,8 @@ func printSchedTaskList(tasks []doomsday.GetSchedulerTask) {
 	table.SetRowLine(true)
 	table.SetAutoWrapText(false)
 	table.SetReflowDuringAutoWrap(false)
-	table.SetHeader([]string{"At", "Reason", "Kind", "Ready"})
+	table.SetHeader([]string{"At", "Backend", "Kind", "Reason", "Ready"})
+	table.SetAlignment(tablewriter.ALIGN_RIGHT)
 
 	readyStr := ansi.Sprintf("@G{YES}")
 	notReadyStr := ansi.Sprintf("@R{NO}")
@@ -42,8 +43,9 @@ func printSchedTaskList(tasks []doomsday.GetSchedulerTask) {
 		}
 		table.Append([]string{
 			timeUntilStr,
-			task.Reason,
+			task.Backend,
 			task.Kind,
+			task.Reason,
 			readyOutStr,
 		})
 	}

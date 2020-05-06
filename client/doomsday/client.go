@@ -179,10 +179,11 @@ type GetSchedulerResponse struct {
 }
 
 type GetSchedulerTask struct {
-	At     int64  `json:"at"`
-	Reason string `json:"reason"`
-	Kind   string `json:"kind"`
-	Ready  bool   `json:"ready"`
+	At      int64  `json:"at"`
+	Backend string `json:"backend"`
+	Reason  string `json:"reason"`
+	Kind    string `json:"kind"`
+	Ready   bool   `json:"ready"`
 }
 
 func (c *Client) GetSchedulerState() (*GetSchedulerResponse, error) {

@@ -199,10 +199,11 @@ type SchedulerState struct {
 }
 
 type SchedulerTask struct {
-	At     time.Time
-	Reason string
-	Kind   string
-	Ready  bool
+	At      time.Time
+	Backend string
+	Reason  string
+	Kind    string
+	Ready   bool
 }
 
 func (t *taskQueue) dumpState() SchedulerState {
@@ -215,10 +216,11 @@ func (t *taskQueue) dumpState() SchedulerState {
 
 	for _, task := range t.data {
 		ret.Tasks = append(ret.Tasks, SchedulerTask{
-			At:     task.runTime,
-			Reason: task.reason.String(),
-			Kind:   task.kind.String(),
-			Ready:  task.ready,
+			At:      task.runTime,
+			Backend: task.source.Core.Name,
+			Reason:  task.reason.String(),
+			Kind:    task.kind.String(),
+			Ready:   task.ready,
 		})
 	}
 
