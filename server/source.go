@@ -30,8 +30,9 @@ type RunTiming struct {
 	FinishedAt time.Time
 }
 
-//TODO: clean up the mode argument
 func (s *Source) Refresh(global *Cache, log *logger.Logger) {
+	log.WriteF("Running populate of `%s'", s.Core.Name)
+
 	old := s.Core.Cache()
 	if old == nil {
 		old = NewCache()
@@ -63,6 +64,7 @@ func (s *Source) Refresh(global *Cache, log *logger.Logger) {
 }
 
 func (s *Source) Auth(log *logger.Logger) {
+	log.WriteF("Starting authentication for `%s'", s.Core.Name)
 
 	s.lock.Lock()
 	s.authStatus.LastRun = RunTiming{StartedAt: time.Now()}

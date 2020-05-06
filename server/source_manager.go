@@ -1,8 +1,8 @@
 package server
 
 import (
+	"fmt"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/doomsday-project/doomsday/client/doomsday"
@@ -17,13 +17,8 @@ const (
 const AdHocThrottle = 30 * time.Second
 
 type SourceManager struct {
-	//sources is a static view of the queue, such that the get calls don't need
-	// to sync with the populate calls. Otherwise, we would need to read-lock on
-	// get calls so that the order of the queue doesn't shift from underneath us
-	// as the async scheduler is running
 	sources []Source
 	queue   *taskQueue
-	lock    sync.RWMutex
 	log     *logger.Logger
 	global  *Cache
 }
@@ -33,18 +28,8 @@ func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
 		panic("No logger was given")
 	}
 
-	now := time.Now()
 	globalCache := NewCache()
 	queue := newTaskQueue(globalCache)
-
-	for i := range sources {
-		queue.enqueue(managerTask{
-			kind:    queueTaskKindAuth,
-			source:  &sources[i],
-			runTime: now,
-			reason:  runReasonSchedule,
-		})
-	}
 
 	return &SourceManager{
 		sources: sources,
@@ -54,8 +39,28 @@ func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
 	}
 }
 
-func (s *SourceManager) BackgroundScheduler() {
+func (s *SourceManager) BackgroundScheduler() error {
+	now := time.Now()
+	for i := range s.sources {
+		s.sources[i].Auth(s.log)
+		if s.sources[i].authStatus.LastErr != nil {
+			return fmt.Errorf("Error performing initial auth for backend `%s': %s",
+				s.sources[i].Core.Name,
+				s.sources[i].authStatus.LastErr)
+		}
+	}
+
+	for i := range s.sources {
+		s.queue.enqueue(managerTask{
+			kind:    queueTaskKindRefresh,
+			source:  &s.sources[i],
+			runTime: now.Add(1 * time.Second),
+			reason:  runReasonSchedule,
+		})
+	}
+
 	s.queue.start()
+	return nil
 }
 
 func (s *SourceManager) Data() doomsday.CacheItems {
@@ -94,4 +99,8 @@ func (s *SourceManager) RefreshAll() {
 			})
 		}
 	}
+}
+
+func (s *SourceManager) SchedulerState() SchedulerState {
+	return s.queue.dumpState()
 }

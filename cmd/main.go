@@ -56,6 +56,10 @@ func registerCommands(app *kingpin.Application) {
 	cmdIndex["dashboard"] = &dashboardCmd{}
 	cmdIndex["dash"] = cmdIndex["dashboard"]
 
+	_ = app.Command("scheduler", "View the current state of the doomsday scheduler").Alias("sched").Hidden()
+	cmdIndex["scheduler"] = &schedulerCmd{}
+	cmdIndex["sched"] = cmdIndex["scheduler"]
+
 	_ = app.Command("refresh", "Refresh the servers cache")
 	cmdIndex["refresh"] = &refreshCmd{}
 

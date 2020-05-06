@@ -68,7 +68,10 @@ func Start(conf Config) error {
 
 	log.WriteF("Starting background scheduler")
 
-	manager.BackgroundScheduler()
+	err = manager.BackgroundScheduler()
+	if err != nil {
+		return fmt.Errorf("Error starting scheduler: %s", err)
+	}
 
 	log.WriteF("Began asynchronous cache population")
 	log.WriteF("Configuring frontend authentication")
@@ -93,6 +96,7 @@ func Start(conf Config) error {
 	router.HandleFunc("/v1/auth", authorizer.LoginHandler()).Methods("POST")
 	router.HandleFunc("/v1/cache", auth(getCache(manager))).Methods("GET")
 	router.HandleFunc("/v1/cache/refresh", auth(refreshCache(manager))).Methods("POST")
+	router.HandleFunc("/v1/scheduler", auth(getScheduler(manager))).Methods("GET")
 
 	if len(conf.Server.Dev.Mappings) > 0 {
 		for file, servePath := range conf.Server.Dev.Mappings {
@@ -176,6 +180,34 @@ func refreshCache(manager *SourceManager) func(w http.ResponseWriter, r *http.Re
 	return func(w http.ResponseWriter, r *http.Request) {
 		go manager.RefreshAll()
 		w.WriteHeader(204)
+	}
+}
+
+func getScheduler(manager *SourceManager) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		schedData := manager.SchedulerState()
+		respRaw := doomsday.GetSchedulerResponse{
+			Tasks: []doomsday.GetSchedulerTask{},
+		}
+
+		for i := range schedData.Tasks {
+			respRaw.Tasks = append(respRaw.Tasks, doomsday.GetSchedulerTask{
+				At:     schedData.Tasks[i].At.Unix(),
+				Reason: schedData.Tasks[i].Reason,
+				Kind:   schedData.Tasks[i].Kind,
+				Ready:  schedData.Tasks[i].Ready,
+			})
+		}
+
+		resp, err := json.Marshal(&respRaw)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		writeBody(w, resp)
 	}
 }
 

@@ -133,7 +133,9 @@ func (t *taskQueue) empty() bool {
 func (t *taskQueue) start() {
 	go func() {
 		for {
-			t.run(t.next())
+			next := t.next()
+			t.log.WriteF("Scheduler running %s %s of `%s'", next.reason, next.kind, next.source.Core.Name)
+			t.run(next)
 		}
 	}()
 }
@@ -143,12 +145,10 @@ func (t *taskQueue) run(task managerTask) {
 	var skipSched bool
 	switch task.kind {
 	case queueTaskKindAuth:
-		log.WriteF("Starting authentication for `%s'", task.source.Core.Name)
 		task.source.Auth(t.log)
 		nextTime, skipSched = task.source.CalcNextAuth()
 
 	case queueTaskKindRefresh:
-		t.log.WriteF("Running %s populate of `%s'", task.reason.String(), task.source.Core.Name)
 		task.source.Refresh(t.globalCache, t.log)
 		nextTime = task.source.CalcNextRefresh()
 	}
@@ -167,4 +167,35 @@ func (t *taskQueue) run(task managerTask) {
 		reason:  runReasonSchedule,
 		kind:    task.kind,
 	})
+}
+
+type SchedulerState struct {
+	Tasks []SchedulerTask
+}
+
+type SchedulerTask struct {
+	At     time.Time
+	Reason string
+	Kind   string
+	Ready  bool
+}
+
+func (t *taskQueue) dumpState() SchedulerState {
+	ret := SchedulerState{
+		Tasks: []SchedulerTask{},
+	}
+
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	for _, task := range t.data {
+		ret.Tasks = append(ret.Tasks, SchedulerTask{
+			At:     task.runTime,
+			Reason: task.reason.String(),
+			Kind:   task.kind.String(),
+			Ready:  task.ready,
+		})
+	}
+
+	return ret
 }

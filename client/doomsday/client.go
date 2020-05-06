@@ -173,3 +173,20 @@ func (c *Client) Info() (*InfoResponse, error) {
 	err := c.doRequest("GET", "/v1/info", nil, &resp)
 	return &resp, err
 }
+
+type GetSchedulerResponse struct {
+	Tasks []GetSchedulerTask `json:"tasks"`
+}
+
+type GetSchedulerTask struct {
+	At     int64  `json:"at"`
+	Reason string `json:"reason"`
+	Kind   string `json:"kind"`
+	Ready  bool   `json:"ready"`
+}
+
+func (c *Client) GetSchedulerState() (*GetSchedulerResponse, error) {
+	resp := GetSchedulerResponse{}
+	err := c.doRequest("GET", "/v1/scheduler", nil, &resp)
+	return &resp, err
+}
