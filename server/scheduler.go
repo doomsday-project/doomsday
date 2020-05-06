@@ -39,6 +39,7 @@ func (r runReason) String() string {
 }
 
 type managerTask struct {
+	id      uint
 	kind    taskKind
 	source  *Source
 	runTime time.Time
@@ -56,12 +57,14 @@ type taskQueue struct {
 	cond        *sync.Cond
 	log         *logger.Logger
 	globalCache *Cache
+	nextTaskID  uint
 }
 
-func newTaskQueue(cache *Cache) *taskQueue {
+func newTaskQueue(cache *Cache, log *logger.Logger) *taskQueue {
 	lock := &sync.Mutex{}
 	return &taskQueue{
 		lock:        lock,
+		log:         log,
 		cond:        sync.NewCond(lock),
 		globalCache: cache,
 	}
@@ -87,15 +90,37 @@ func (t *taskQueue) next() managerTask {
 func (t *taskQueue) enqueue(task managerTask) {
 	t.lock.Lock()
 	t.removeExistingNoLock(task.source, task.kind)
+	task.id = t.nextTaskID
+	t.nextTaskID++
 	t.data = append(t.data, task)
 	t.sort()
+
 	t.lock.Unlock()
 	time.AfterFunc(time.Until(task.runTime), func() {
 		t.lock.Lock()
-		task.ready = true
-		t.cond.Signal()
-		t.lock.Unlock()
+		defer t.lock.Unlock()
+
+		foundTask := t.findTaskWithIDNoLock(task.id)
+		if foundTask != nil {
+			foundTask.ready = true
+			t.cond.Signal()
+		}
 	})
+}
+
+//If the queue order is shuffled in any way after a call to this function, the
+// returned pointer is invalidated. Therefore, you should only call this and
+// manipulate the returned object while you are holding the lock
+func (t *taskQueue) findTaskWithIDNoLock(id uint) *managerTask {
+	var ret *managerTask
+	for i := range t.data {
+		if t.data[i].id == id {
+			ret = &t.data[i]
+			break
+		}
+	}
+
+	return ret
 }
 
 func (t *taskQueue) dequeueNoLock() managerTask {

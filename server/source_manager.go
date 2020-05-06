@@ -29,7 +29,7 @@ func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
 	}
 
 	globalCache := NewCache()
-	queue := newTaskQueue(globalCache)
+	queue := newTaskQueue(globalCache, log)
 
 	return &SourceManager{
 		sources: sources,
