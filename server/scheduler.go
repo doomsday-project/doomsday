@@ -13,6 +13,8 @@ import (
 type taskKind uint
 
 const (
+	//right now, the order of these actually matters, because it is used for
+	// prioritization when sorting the queue
 	queueTaskKindAuth taskKind = iota
 	queueTaskKindRefresh
 )
@@ -106,15 +108,18 @@ func (t *taskQueue) enqueue(task managerTask) {
 		defer t.lock.Unlock()
 
 		foundTask := t.data.findTaskWithID(task.id)
-		if foundTask != nil {
-			t.log.WriteF("Marking %s %s task for backend `%s' as ready (id %d)",
-				foundTask.reason, foundTask.kind, foundTask.source.Core.Name, task.id)
-			foundTask.ready = true
-			t.cond.Signal()
-		} else {
+		if foundTask == nil {
 			t.log.WriteF("Skipping marking task as ready because it has been removed pre-emptively (id %d)",
 				task.id)
+			return
 		}
+
+		t.log.WriteF("Marking %s %s task for backend `%s' as ready (id %d)",
+			foundTask.reason, foundTask.kind, foundTask.source.Core.Name, task.id)
+		foundTask.ready = true
+		t.data.sort()
+
+		t.cond.Signal()
 	})
 }
 
@@ -130,8 +135,27 @@ func (t managerTasks) idxWithID(id uint) int {
 	return ret
 }
 
+//sort priority:
+// 1. readiness
+// 2. auth before refresh if both are ready
+// 3. scheduled time
+// 4. id
 func (t managerTasks) sort() {
 	sort.Slice(t, func(i, j int) bool {
+		if t[i].ready && !t[j].ready {
+			return true
+		}
+
+		if t[j].ready && !t[i].ready {
+			return false
+		}
+
+		if t[i].ready && t[j].ready {
+			if t[i].kind != t[j].kind {
+				return t[i].kind < t[j].kind
+			}
+		}
+
 		if t[i].runTime.Equal(t[j].runTime) {
 			return t[i].id < t[j].id
 		}
