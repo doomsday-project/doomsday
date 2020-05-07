@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
 	"sort"
 	"sync"
 	"time"
@@ -92,18 +94,26 @@ func (t *taskQueue) enqueue(task managerTask) {
 	t.removeExistingNoLock(task.source, task.kind)
 	task.id = t.nextTaskID
 	t.nextTaskID++
+	t.log.WriteF("Enqueuing new %s %s task for backend `%s' with id %d", task.reason, task.kind, task.source.Core.Name, task.id)
 	t.data = append(t.data, task)
 	t.sort()
-
+	t.log.WriteF("task enqueued")
+	t.log.WriteF("scheduler state:\n%s", t.dumpStateNoLock().String())
 	t.lock.Unlock()
+
 	time.AfterFunc(time.Until(task.runTime), func() {
 		t.lock.Lock()
 		defer t.lock.Unlock()
 
 		foundTask := t.findTaskWithIDNoLock(task.id)
 		if foundTask != nil {
+			t.log.WriteF("Marking %s %s task for backend `%s' as ready (id %d)",
+				foundTask.reason, foundTask.kind, foundTask.source.Core.Name, task.id)
 			foundTask.ready = true
 			t.cond.Signal()
+		} else {
+			t.log.WriteF("Skipping marking task as ready because it has been removed pre-emptively (id %d)",
+				task.id)
 		}
 	})
 }
@@ -134,19 +144,25 @@ func (t *taskQueue) dequeueNoLock() managerTask {
 
 func (t *taskQueue) sort() {
 	sort.Slice(t.data, func(i, j int) bool {
+		if t.data[i].runTime.Equal(t.data[j].runTime) {
+			return t.data[i].id < t.data[j].id
+		}
 		return t.data[i].runTime.Before(t.data[j].runTime)
 	})
 }
 
 func (t *taskQueue) removeExistingNoLock(source *Source, taskType taskKind) {
-	//A source is considered equal if it has the same pointer to a core
+	t.log.WriteF("Searching for %s task for backend `%s' to remove", taskType, source.Core.Name)
+	t.log.WriteF("scheduler state:\n%s", t.dumpStateNoLock().String())
 	for i := range t.data {
-		if t.data[i].source.Core == source.Core &&
-			t.data[i].kind == taskType {
+		if t.data[i].source.Core.Name == source.Core.Name && t.data[i].kind == taskType {
 
+			t.log.WriteF("Removing %s of `%s' task with id `%d'",
+				t.data[i].kind, t.data[i].source.Core.Name, t.data[i].id)
 			t.data[i] = t.data[len(t.data)-1]
 			t.data = t.data[:len(t.data)-1]
 			t.sort()
+			return
 		}
 	}
 }
@@ -195,27 +211,39 @@ func (t *taskQueue) run(task managerTask) {
 }
 
 type SchedulerState struct {
-	Tasks []SchedulerTask
+	Tasks []SchedulerTask `json:"tasks"`
+}
+
+func (s SchedulerState) String() string {
+	b, _ := json.Marshal(s)
+	bOut := bytes.Buffer{}
+	json.Indent(&bOut, b, "", "  ")
+	return bOut.String()
 }
 
 type SchedulerTask struct {
-	At      time.Time
-	Backend string
-	Reason  string
-	Kind    string
-	Ready   bool
+	ID      uint      `json:"id"`
+	At      time.Time `json:"at"`
+	Backend string    `json:"backend"`
+	Reason  string    `json:"reason"`
+	Kind    string    `json:"kind"`
+	Ready   bool      `json:"ready"`
 }
 
 func (t *taskQueue) dumpState() SchedulerState {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	return t.dumpStateNoLock()
+}
+
+func (t *taskQueue) dumpStateNoLock() SchedulerState {
 	ret := SchedulerState{
 		Tasks: []SchedulerTask{},
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	for _, task := range t.data {
 		ret.Tasks = append(ret.Tasks, SchedulerTask{
+			ID:      task.id,
 			At:      task.runTime,
 			Backend: task.source.Core.Name,
 			Reason:  task.reason.String(),

@@ -14,7 +14,7 @@ const (
 	ExpiredRetryInterval = 5 * time.Minute
 )
 
-const AdHocThrottle = 30 * time.Second
+const AdHocThrottle = 5 * time.Second
 
 type SourceManager struct {
 	sources []Source
@@ -87,12 +87,12 @@ func (s *SourceManager) Data() doomsday.CacheItems {
 func (s *SourceManager) RefreshAll() {
 	now := time.Now()
 	cutoff := now.Add(-AdHocThrottle)
-	for _, current := range s.sources {
-		if current.refreshStatus.LastRun.StartedAt.IsZero() || //it was never run?
-			(!current.refreshStatus.LastRun.FinishedAt.IsZero() && //if FinishedAt is zero, its currently in progress
-				current.refreshStatus.LastRun.FinishedAt.Before(cutoff)) {
+	for i := range s.sources {
+		if s.sources[i].refreshStatus.LastRun.StartedAt.IsZero() || //it was never run?
+			(!s.sources[i].refreshStatus.LastRun.FinishedAt.IsZero() && //if FinishedAt is zero, its currently in progress
+				s.sources[i].refreshStatus.LastRun.FinishedAt.Before(cutoff)) {
 			s.queue.enqueue(managerTask{
-				source:  &current,
+				source:  &s.sources[i],
 				kind:    queueTaskKindRefresh,
 				runTime: now,
 				reason:  runReasonAdhoc,
