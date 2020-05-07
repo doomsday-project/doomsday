@@ -45,12 +45,12 @@ func (s *Source) Refresh(global *Cache, log *logger.Logger) {
 	results, err := s.Core.Populate()
 
 	s.lock.Lock()
-	s.refreshStatus.LastRun.FinishedAt = time.Now()
 	defer s.lock.Unlock()
+
+	s.refreshStatus.LastRun.FinishedAt = time.Now()
 
 	if err != nil {
 		log.WriteF("Error populating info from backend `%s': %s", s.Core.Name, err)
-		s.lock.Lock()
 		s.refreshStatus.LastErr = err
 		return
 	}
@@ -78,8 +78,9 @@ func (s *Source) Auth(log *logger.Logger) {
 	s.authStatus.LastRun.FinishedAt = time.Now()
 
 	if err != nil {
-		s.authStatus.LastErr = err
 		log.WriteF("Failed auth for `%s' after %s: %s", s.Core.Name, time.Since(s.authStatus.LastRun.StartedAt), err)
+		s.authStatus.LastErr = err
+		return
 	}
 
 	s.authStatus.LastErr = nil
