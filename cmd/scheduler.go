@@ -36,7 +36,7 @@ func printSchedTaskList(tasks []doomsday.GetSchedulerTask) {
 	notReadyStr := ansi.Sprintf("@R{NO}")
 	now := time.Now()
 	for _, task := range tasks {
-		timeUntilStr := time.Unix(task.At, 0).Sub(now).String()
+		timeUntilStr := time.Unix(task.At, 0).Sub(now).Truncate(100 * time.Millisecond).String()
 		readyOutStr := notReadyStr
 		if task.Ready {
 			readyOutStr = readyStr
