@@ -40,7 +40,6 @@ func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
 }
 
 func (s *SourceManager) BackgroundScheduler() error {
-	now := time.Now()
 	for i := range s.sources {
 		s.sources[i].Auth(s.log)
 		if s.sources[i].authStatus.LastErr != nil {
@@ -50,13 +49,25 @@ func (s *SourceManager) BackgroundScheduler() error {
 		}
 	}
 
+	now := time.Now()
+
 	for i := range s.sources {
 		s.queue.enqueue(managerTask{
 			kind:    queueTaskKindRefresh,
 			source:  &s.sources[i],
-			runTime: now.Add(1 * time.Second),
+			runTime: now,
 			reason:  runReasonSchedule,
 		})
+
+		nextAuthTime, skipAuth := s.sources[i].CalcNextAuth()
+		if !skipAuth {
+			s.queue.enqueue(managerTask{
+				kind:    queueTaskKindAuth,
+				source:  &s.sources[i],
+				runTime: nextAuthTime,
+				reason:  runReasonSchedule,
+			})
+		}
 	}
 
 	s.queue.start()

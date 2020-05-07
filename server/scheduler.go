@@ -19,7 +19,7 @@ const (
 
 func (t taskKind) String() string {
 	if t == queueTaskKindAuth {
-		return "authentication"
+		return "auth"
 	}
 
 	return "refresh"
