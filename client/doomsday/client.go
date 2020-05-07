@@ -175,7 +175,8 @@ func (c *Client) Info() (*InfoResponse, error) {
 }
 
 type GetSchedulerResponse struct {
-	Tasks []GetSchedulerTask `json:"tasks"`
+	Running []GetSchedulerTask `json:"running"`
+	Pending []GetSchedulerTask `json:"pending"`
 }
 
 type GetSchedulerTask struct {

@@ -53,8 +53,11 @@ func (m *managerTask) durationUntil() time.Duration {
 	return m.runTime.Sub(time.Now())
 }
 
+type managerTasks []managerTask
+
 type taskQueue struct {
-	data        []managerTask
+	data        managerTasks
+	running     managerTasks
 	lock        *sync.Mutex
 	cond        *sync.Cond
 	log         *logger.Logger
@@ -82,6 +85,8 @@ func (t *taskQueue) next() managerTask {
 	}
 
 	ret := t.dequeueNoLock()
+	t.running = append(t.running, ret)
+
 	t.lock.Unlock()
 	return ret
 }
@@ -96,7 +101,7 @@ func (t *taskQueue) enqueue(task managerTask) {
 	t.nextTaskID++
 	t.log.WriteF("Enqueuing new %s %s task for backend `%s' with id %d", task.reason, task.kind, task.source.Core.Name, task.id)
 	t.data = append(t.data, task)
-	t.sort()
+	t.data.sort()
 	t.log.WriteF("task enqueued")
 	t.log.WriteF("scheduler state:\n%s", t.dumpStateNoLock().String())
 	t.lock.Unlock()
@@ -105,7 +110,7 @@ func (t *taskQueue) enqueue(task managerTask) {
 		t.lock.Lock()
 		defer t.lock.Unlock()
 
-		foundTask := t.findTaskWithIDNoLock(task.id)
+		foundTask := t.data.findTaskWithID(task.id)
 		if foundTask != nil {
 			t.log.WriteF("Marking %s %s task for backend `%s' as ready (id %d)",
 				foundTask.reason, foundTask.kind, foundTask.source.Core.Name, task.id)
@@ -118,14 +123,11 @@ func (t *taskQueue) enqueue(task managerTask) {
 	})
 }
 
-//If the queue order is shuffled in any way after a call to this function, the
-// returned pointer is invalidated. Therefore, you should only call this and
-// manipulate the returned object while you are holding the lock
-func (t *taskQueue) findTaskWithIDNoLock(id uint) *managerTask {
-	var ret *managerTask
-	for i := range t.data {
-		if t.data[i].id == id {
-			ret = &t.data[i]
+func (t managerTasks) idxWithID(id uint) int {
+	var ret int = -1
+	for i := range t {
+		if t[i].id == id {
+			ret = i
 			break
 		}
 	}
@@ -133,22 +135,42 @@ func (t *taskQueue) findTaskWithIDNoLock(id uint) *managerTask {
 	return ret
 }
 
-func (t *taskQueue) dequeueNoLock() managerTask {
-	ret := t.data[0]
-	t.data[0] = t.data[len(t.data)-1]
-	t.data = t.data[:len(t.data)-1]
-	t.sort()
+func (t managerTasks) sort() {
+	sort.Slice(t, func(i, j int) bool {
+		if t[i].runTime.Equal(t[j].runTime) {
+			return t[i].id < t[j].id
+		}
+		return t[i].runTime.Before(t[j].runTime)
+	})
+}
+
+//If the queue order is shuffled in any way after a call to this function, the
+// returned pointer is invalidated. Therefore, you should only call this and
+// manipulate the returned object while you are holding the lock
+func (t managerTasks) findTaskWithID(id uint) *managerTask {
+	var ret *managerTask
+	if idx := t.idxWithID(id); idx >= 0 {
+		ret = &t[idx]
+	}
 
 	return ret
 }
 
-func (t *taskQueue) sort() {
-	sort.Slice(t.data, func(i, j int) bool {
-		if t.data[i].runTime.Equal(t.data[j].runTime) {
-			return t.data[i].id < t.data[j].id
-		}
-		return t.data[i].runTime.Before(t.data[j].runTime)
-	})
+func (t *managerTasks) deleteTaskWithID(id uint) {
+	if idx := t.idxWithID(id); idx >= 0 {
+		(*t)[idx] = (*t)[len(*t)-1]
+		*t = (*t)[:len(*t)-1]
+		(*t).sort()
+	}
+}
+
+func (t *taskQueue) dequeueNoLock() managerTask {
+	ret := t.data[0]
+	t.data[0] = t.data[len(t.data)-1]
+	t.data = t.data[:len(t.data)-1]
+	t.data.sort()
+
+	return ret
 }
 
 func (t *taskQueue) removeExistingNoLock(source *Source, taskType taskKind) {
@@ -161,7 +183,7 @@ func (t *taskQueue) removeExistingNoLock(source *Source, taskType taskKind) {
 				t.data[i].kind, t.data[i].source.Core.Name, t.data[i].id)
 			t.data[i] = t.data[len(t.data)-1]
 			t.data = t.data[:len(t.data)-1]
-			t.sort()
+			t.data.sort()
 			return
 		}
 	}
@@ -199,6 +221,10 @@ func (t *taskQueue) run(task managerTask) {
 		return
 	}
 
+	t.lock.Lock()
+	t.running.deleteTaskWithID(task.id)
+	t.lock.Unlock()
+
 	task.runTime = nextTime
 	task.reason = runReasonSchedule
 
@@ -211,7 +237,8 @@ func (t *taskQueue) run(task managerTask) {
 }
 
 type SchedulerState struct {
-	Tasks []SchedulerTask `json:"tasks"`
+	Running []SchedulerTask `json:"running"`
+	Pending []SchedulerTask `json:"pending"`
 }
 
 func (s SchedulerState) String() string {
@@ -238,11 +265,23 @@ func (t *taskQueue) dumpState() SchedulerState {
 
 func (t *taskQueue) dumpStateNoLock() SchedulerState {
 	ret := SchedulerState{
-		Tasks: []SchedulerTask{},
+		Running: []SchedulerTask{},
+		Pending: []SchedulerTask{},
+	}
+
+	for _, task := range t.running {
+		ret.Running = append(ret.Running, SchedulerTask{
+			ID:      task.id,
+			At:      task.runTime,
+			Backend: task.source.Core.Name,
+			Reason:  task.reason.String(),
+			Kind:    task.kind.String(),
+			Ready:   task.ready,
+		})
 	}
 
 	for _, task := range t.data {
-		ret.Tasks = append(ret.Tasks, SchedulerTask{
+		ret.Pending = append(ret.Pending, SchedulerTask{
 			ID:      task.id,
 			At:      task.runTime,
 			Backend: task.source.Core.Name,

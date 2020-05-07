@@ -187,16 +187,27 @@ func getScheduler(manager *SourceManager) func(w http.ResponseWriter, r *http.Re
 	return func(w http.ResponseWriter, r *http.Request) {
 		schedData := manager.SchedulerState()
 		respRaw := doomsday.GetSchedulerResponse{
-			Tasks: []doomsday.GetSchedulerTask{},
+			Running: []doomsday.GetSchedulerTask{},
+			Pending: []doomsday.GetSchedulerTask{},
 		}
 
-		for i := range schedData.Tasks {
-			respRaw.Tasks = append(respRaw.Tasks, doomsday.GetSchedulerTask{
-				At:      schedData.Tasks[i].At.Unix(),
-				Backend: schedData.Tasks[i].Backend,
-				Reason:  schedData.Tasks[i].Reason,
-				Kind:    schedData.Tasks[i].Kind,
-				Ready:   schedData.Tasks[i].Ready,
+		for i := range schedData.Running {
+			respRaw.Running = append(respRaw.Running, doomsday.GetSchedulerTask{
+				At:      schedData.Running[i].At.Unix(),
+				Backend: schedData.Running[i].Backend,
+				Reason:  schedData.Running[i].Reason,
+				Kind:    schedData.Running[i].Kind,
+				Ready:   schedData.Running[i].Ready,
+			})
+		}
+
+		for i := range schedData.Pending {
+			respRaw.Pending = append(respRaw.Pending, doomsday.GetSchedulerTask{
+				At:      schedData.Pending[i].At.Unix(),
+				Backend: schedData.Pending[i].Backend,
+				Reason:  schedData.Pending[i].Reason,
+				Kind:    schedData.Pending[i].Kind,
+				Ready:   schedData.Pending[i].Ready,
 			})
 		}
 

@@ -18,7 +18,19 @@ func (*schedulerCmd) Run() error {
 		return err
 	}
 
-	printSchedTaskList(state.Tasks)
+	header := tablewriter.NewWriter(os.Stdout)
+	header.SetHeader([]string{"RUNNING"})
+	header.SetHeaderLine(false)
+	header.Render()
+
+	printSchedTaskList(state.Running)
+
+	header = tablewriter.NewWriter(os.Stdout)
+	header.SetHeader([]string{"PENDING"})
+	header.SetHeaderLine(false)
+	header.Render()
+
+	printSchedTaskList(state.Pending)
 	return nil
 }
 
