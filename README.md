@@ -49,7 +49,3 @@ Then, if your cf app manifest is called `manifest.yml`, run
 ```sh
 cf push -f manifest.yml
 ```
-
-## Development
-
-This project uses https://github.com/kardianos/govendor for vendoring.
