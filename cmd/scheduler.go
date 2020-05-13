@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/doomsday-project/doomsday/client/doomsday"
@@ -41,7 +42,7 @@ func printSchedTaskList(tasks []doomsday.GetSchedulerTask) {
 	table.SetRowLine(true)
 	table.SetAutoWrapText(false)
 	table.SetReflowDuringAutoWrap(false)
-	table.SetHeader([]string{"At", "Backend", "Kind", "Reason", "Ready"})
+	table.SetHeader([]string{"ID", "At", "Backend", "Kind", "Reason", "Ready"})
 	table.SetAlignment(tablewriter.ALIGN_RIGHT)
 
 	readyStr := ansi.Sprintf("@G{YES}")
@@ -54,6 +55,7 @@ func printSchedTaskList(tasks []doomsday.GetSchedulerTask) {
 			readyOutStr = readyStr
 		}
 		table.Append([]string{
+			strconv.FormatUint(uint64(task.ID), 10),
 			timeUntilStr,
 			task.Backend,
 			task.Kind,

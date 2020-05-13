@@ -197,6 +197,7 @@ func getScheduler(manager *SourceManager) func(w http.ResponseWriter, r *http.Re
 				Backend: schedData.Running[i].Backend,
 				Reason:  schedData.Running[i].Reason,
 				Kind:    schedData.Running[i].Kind,
+				ID:      schedData.Running[i].ID,
 				Ready:   schedData.Running[i].Ready,
 			})
 		}
@@ -207,6 +208,7 @@ func getScheduler(manager *SourceManager) func(w http.ResponseWriter, r *http.Re
 				Backend: schedData.Pending[i].Backend,
 				Reason:  schedData.Pending[i].Reason,
 				Kind:    schedData.Pending[i].Kind,
+				ID:      schedData.Pending[i].ID,
 				Ready:   schedData.Pending[i].Ready,
 			})
 		}

@@ -184,6 +184,7 @@ type GetSchedulerTask struct {
 	Backend string `json:"backend"`
 	Reason  string `json:"reason"`
 	Kind    string `json:"kind"`
+	ID      uint   `json:"id"`
 	Ready   bool   `json:"ready"`
 }
 
