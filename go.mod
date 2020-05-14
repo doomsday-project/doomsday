@@ -13,8 +13,8 @@ require (
 	github.com/robfig/cron v1.2.0
 	github.com/starkandwayne/goutils v0.0.0-20190115202530-896b8a6904be
 	github.com/thomasmitchell/go-shout v0.0.0-20200117221442-ad6c1a8d1669
-	github.com/thomasmmitchell/go-shout v0.0.0-20180822165752-cac99ad33707
 	golang.org/x/crypto v0.0.0-20180319061731-c3a3ad6d03f7
+	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/yaml.v2 v2.2.7
 )

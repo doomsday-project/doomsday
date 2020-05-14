@@ -185,7 +185,7 @@ type GetSchedulerTask struct {
 	Reason  string `json:"reason"`
 	Kind    string `json:"kind"`
 	ID      uint   `json:"id"`
-	Ready   bool   `json:"ready"`
+	State   string `json:"state"`
 }
 
 func (c *Client) GetSchedulerState() (*GetSchedulerResponse, error) {

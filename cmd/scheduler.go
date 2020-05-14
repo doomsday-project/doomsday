@@ -8,7 +8,6 @@ import (
 
 	"github.com/doomsday-project/doomsday/client/doomsday"
 	"github.com/olekukonko/tablewriter"
-	"github.com/starkandwayne/goutils/ansi"
 )
 
 type schedulerCmd struct{}
@@ -42,25 +41,19 @@ func printSchedTaskList(tasks []doomsday.GetSchedulerTask) {
 	table.SetRowLine(true)
 	table.SetAutoWrapText(false)
 	table.SetReflowDuringAutoWrap(false)
-	table.SetHeader([]string{"ID", "At", "Backend", "Kind", "Reason", "Ready"})
+	table.SetHeader([]string{"ID", "At", "Backend", "Kind", "Reason", "State"})
 	table.SetAlignment(tablewriter.ALIGN_RIGHT)
 
-	readyStr := ansi.Sprintf("@G{YES}")
-	notReadyStr := ansi.Sprintf("@R{NO}")
 	now := time.Now()
 	for _, task := range tasks {
 		timeUntilStr := time.Unix(task.At, 0).Sub(now).Truncate(100 * time.Millisecond).String()
-		readyOutStr := notReadyStr
-		if task.Ready {
-			readyOutStr = readyStr
-		}
 		table.Append([]string{
 			strconv.FormatUint(uint64(task.ID), 10),
 			timeUntilStr,
 			task.Backend,
 			task.Kind,
 			task.Reason,
-			readyOutStr,
+			task.State,
 		})
 	}
 	table.Render()

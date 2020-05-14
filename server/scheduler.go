@@ -13,18 +13,21 @@ import (
 type taskKind uint
 
 const (
-	//right now, the order of these actually matters, because it is used for
+	//the order of these actually matters, because it is used for
 	// prioritization when sorting the queue
 	queueTaskKindAuth taskKind = iota
 	queueTaskKindRefresh
 )
 
 func (t taskKind) String() string {
-	if t == queueTaskKindAuth {
+	switch t {
+	case queueTaskKindAuth:
 		return "auth"
+	case queueTaskKindRefresh:
+		return "refresh"
+	default:
+		return "unknown"
 	}
-
-	return "refresh"
 }
 
 type runReason uint
@@ -35,11 +38,37 @@ const (
 )
 
 func (r runReason) String() string {
-	if r == runReasonSchedule {
+	switch r {
+	case runReasonSchedule:
 		return "scheduled"
+	case runReasonAdhoc:
+		return "adhoc"
+	default:
+		return "unknown"
 	}
+}
 
-	return "adhoc"
+type taskState uint
+
+const (
+	//the order of these actually matters, because it is used for
+	// prioritization when sorting the queue
+	queueTaskStatePending = iota
+	queueTaskStateReady
+	queueTaskStateSkip
+)
+
+func (s taskState) String() string {
+	switch s {
+	case queueTaskStatePending:
+		return "pending"
+	case queueTaskStateReady:
+		return "ready"
+	case queueTaskStateSkip:
+		return "skipping"
+	default:
+		return "unknown"
+	}
 }
 
 type managerTask struct {
@@ -48,11 +77,21 @@ type managerTask struct {
 	source  *Source
 	runTime time.Time
 	reason  runReason
-	ready   bool
+	state   taskState
 }
 
 func (m *managerTask) durationUntil() time.Duration {
 	return m.runTime.Sub(time.Now())
+}
+
+func (m *managerTask) run(cache *Cache, log *logger.Logger) {
+	switch m.kind {
+	case queueTaskKindAuth:
+		m.source.Auth(log)
+
+	case queueTaskKindRefresh:
+		m.source.Refresh(cache, log)
+	}
 }
 
 type managerTasks []managerTask
@@ -79,15 +118,32 @@ func newTaskQueue(cache *Cache, log *logger.Logger) *taskQueue {
 
 //next blocks until there is a task for this thread to handle. it then dequeues
 // and returns that task.
-func (t *taskQueue) next() managerTask {
+func (t *taskQueue) runNext() managerTask {
 	t.lock.Lock()
 
-	for t.empty() || !t.data[0].ready {
+	for t.empty() || t.data[0].state == queueTaskStatePending {
 		t.cond.Wait()
 	}
 
 	ret := t.dequeueNoLock()
+
+	if ret.state == queueTaskStateSkip {
+		t.lock.Unlock()
+		t.log.WriteF("Scheduler skipping %s %s of `%s'", ret.reason, ret.kind, ret.source.Core.Name)
+		return ret
+	}
+
+	t.running = append(t.running, ret)
 	t.lock.Unlock()
+
+	t.log.WriteF("Scheduler running %s %s of `%s'", ret.reason, ret.kind, ret.source.Core.Name)
+
+	ret.run(t.globalCache, t.log)
+
+	t.lock.Lock()
+	t.running.deleteTaskWithID(ret.id)
+	t.lock.Unlock()
+
 	return ret
 }
 
@@ -114,11 +170,17 @@ func (t *taskQueue) enqueue(task managerTask) {
 			return
 		}
 
-		t.log.WriteF("Marking %s %s task for backend `%s' as ready (id %d)",
-			foundTask.reason, foundTask.kind, foundTask.source.Core.Name, task.id)
-		foundTask.ready = true
-		t.data.sort()
+		if t.data.sameTaskExistsAndReady(foundTask) || t.running.sameTaskExistsAndReady(foundTask) {
+			t.log.WriteF("Marking %s %s task for backend `%s' as to skip (id %d)",
+				foundTask.reason, foundTask.kind, foundTask.source.Core.Name, task.id)
+			foundTask.state = queueTaskStateSkip
+		} else {
+			t.log.WriteF("Marking %s %s task for backend `%s' as ready (id %d)",
+				foundTask.reason, foundTask.kind, foundTask.source.Core.Name, task.id)
+			foundTask.state = queueTaskStateReady
+		}
 
+		t.data.sort()
 		t.cond.Signal()
 	})
 }
@@ -136,30 +198,25 @@ func (t managerTasks) idxWithID(id uint) int {
 }
 
 //sort priority:
-// 1. readiness
+// 1. skip<ready<pending
 // 2. auth before refresh if both are ready
 // 3. scheduled time
 // 4. id
 func (t managerTasks) sort() {
 	sort.Slice(t, func(i, j int) bool {
-		if t[i].ready && !t[j].ready {
-			return true
+		if t[i].state != t[j].state {
+			return t[i].state > t[j].state
 		}
 
-		if t[j].ready && !t[i].ready {
-			return false
+		if t[i].kind != t[j].kind {
+			return t[i].kind < t[j].kind
 		}
 
-		if t[i].ready && t[j].ready {
-			if t[i].kind != t[j].kind {
-				return t[i].kind < t[j].kind
-			}
+		if !t[i].runTime.Equal(t[j].runTime) {
+			return t[i].runTime.Before(t[j].runTime)
 		}
 
-		if t[i].runTime.Equal(t[j].runTime) {
-			return t[i].id < t[j].id
-		}
-		return t[i].runTime.Before(t[j].runTime)
+		return t[i].id < t[j].id
 	})
 }
 
@@ -175,16 +232,20 @@ func (t managerTasks) findTaskWithID(id uint) *managerTask {
 	return ret
 }
 
-func (t managerTasks) idxWithSourceAndKind(sourceName string, taskType taskKind) int {
-	var ret int = -1
+//no lock
+//considered the same task if the associated source core has the same name, and
+// the kind of task is the same. Considered ready if the ready member of the task
+// is true.
+func (t managerTasks) sameTaskExistsAndReady(task *managerTask) bool {
 	for i := range t {
-		if t[i].source.Core.Name == sourceName && t[i].kind == taskType {
-			ret = i
-			break
+		if t[i].source.Core.Name == task.source.Core.Name &&
+			t[i].kind == task.kind &&
+			t[i].state == queueTaskStateReady {
+			return true
 		}
 	}
 
-	return ret
+	return false
 }
 
 func (t *managerTasks) deleteTaskWithID(id uint) {
@@ -211,42 +272,10 @@ func (t *taskQueue) empty() bool {
 func (t *taskQueue) start() {
 	go func() {
 		for {
-			next := t.next()
-			t.log.WriteF("Scheduler running %s %s of `%s'", next.reason, next.kind, next.source.Core.Name)
-			t.run(next)
+			next := t.runNext()
 			t.scheduleNextRunOf(next)
 		}
 	}()
-}
-
-func (t *taskQueue) run(task managerTask) {
-
-	t.lock.Lock()
-
-	currentIdx := t.running.idxWithSourceAndKind(task.source.Core.Name, task.kind)
-	if currentIdx >= 0 {
-		t.log.WriteF("Skipping %s %s task run of `%s' because same task already in progress", task.reason, task.kind, task.source.Core.Name)
-
-		t.lock.Unlock()
-		return
-	}
-	t.running = append(t.running, task)
-
-	t.lock.Unlock()
-
-	defer func() {
-		t.lock.Lock()
-		t.running.deleteTaskWithID(task.id)
-		t.lock.Unlock()
-	}()
-
-	switch task.kind {
-	case queueTaskKindAuth:
-		task.source.Auth(t.log)
-
-	case queueTaskKindRefresh:
-		task.source.Refresh(t.globalCache, t.log)
-	}
 }
 
 func (t *taskQueue) scheduleNextRunOf(task managerTask) {
@@ -296,7 +325,7 @@ type SchedulerTask struct {
 	Backend string    `json:"backend"`
 	Reason  string    `json:"reason"`
 	Kind    string    `json:"kind"`
-	Ready   bool      `json:"ready"`
+	State   string    `json:"state"`
 }
 
 func (t *taskQueue) dumpState() SchedulerState {
@@ -318,7 +347,7 @@ func (t *taskQueue) dumpStateNoLock() SchedulerState {
 			Backend: task.source.Core.Name,
 			Reason:  task.reason.String(),
 			Kind:    task.kind.String(),
-			Ready:   task.ready,
+			State:   task.state.String(),
 		})
 	}
 
@@ -329,7 +358,7 @@ func (t *taskQueue) dumpStateNoLock() SchedulerState {
 			Backend: task.source.Core.Name,
 			Reason:  task.reason.String(),
 			Kind:    task.kind.String(),
-			Ready:   task.ready,
+			State:   task.state.String(),
 		})
 	}
 
