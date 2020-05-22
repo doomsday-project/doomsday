@@ -1,0 +1,15 @@
+#This is a minimalist doomsday server configuration manifest for testing and
+# default deployments
+
+backends:
+# Checks certs of configured URLs by connecting over TCP, attempting a TLS
+#   handshake, and then returning the served certificate
+- type: tlsclient
+  name: mytlsclient
+  properties:
+    # (list) A list of URLs to connect to. You should omit the scheme of the URLs
+    hosts:
+    # (string)
+    - starkandwayne.com
+    - shieldproject.io
+    - genesisproject.io
