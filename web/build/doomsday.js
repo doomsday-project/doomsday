@@ -287,9 +287,11 @@ class DashboardPage extends PageBase {
         }
         if (lists.length == 0) {
             this.certsElement.template("no-certs-page");
-            return;
         }
-        this.certsElement.template("cert-list-group", { lists: lists });
+        else {
+            this.certsElement.template("cert-list-group", { lists: lists });
+            this.certsElement.show();
+        }
         this.showMoreButton = $("#certs-show-more");
         this.showMoreButton.on("click", (e) => {
             e.preventDefault();
@@ -302,7 +304,7 @@ class DashboardPage extends PageBase {
             this.showMoreButton.prop("disabled", false);
             return false;
         });
-        this.certsElement.show();
+        return;
     }
     durationString(days) {
         if (days < 0) {
