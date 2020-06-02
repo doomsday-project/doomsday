@@ -11,8 +11,9 @@ VERSION ?= development
 LDFLAGS := -X "github.com/doomsday-project/doomsday/version.Version=$(VERSION)-$(COMMIT_HASH)$(DIRTY)"
 BUILD := go build -v -ldflags='$(LDFLAGS)' -o $(OUTPUT_NAME) $(BUILD_TARGET)
 
-.PHONY: build darwin linux all clean embed server
+.PHONY: build darwin linux all clean embed server tsc
 .DEFAULT: build
+
 
 build: embed server
 
@@ -28,8 +29,11 @@ linux:
 
 all: embed darwin linux
 
-embed:
+embed: tsc
 	GOOS="" GOARCH="" go run web/embed/main.go web/embed/mappings.yml
+
+tsc:
+	tsc --project web/tsconfig.json
 
 clean:
 	rm -f $(APP_NAME) $(APP_NAME)-darwin $(APP_NAME)-linux
