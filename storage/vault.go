@@ -16,13 +16,17 @@ import (
 )
 
 const (
-	vaultAuthToken = iota
+	vaultAuthToken uint = iota
 	vaultAuthApprole
 )
 
 type VaultAccessor struct {
 	client   *vaultkv.KV
 	basePath string
+	authType uint
+	//roleID and secretID are used for AppRole authentication
+	roleID   string
+	secretID string
 }
 
 type VaultConfig struct {
@@ -37,18 +41,24 @@ type VaultConfig struct {
 	} `yaml:"auth"`
 }
 
-func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
+type vaultAuthMetadata struct {
+	renewalDeadline time.Time
+}
+
+func newVaultAccessor(conf VaultConfig) (*VaultAccessor, vaultAuthMetadata, error) {
 	if !regexp.MustCompile("^.*://").MatchString(conf.Address) {
 		conf.Address = fmt.Sprintf("https://%s", conf.Address)
 	}
 
+	metadata := vaultAuthMetadata{}
+
 	u, err := url.Parse(conf.Address)
 	if err != nil {
-		return nil, fmt.Errorf("Could not parse url (%s) in config: %s", conf.Address, err)
+		return nil, metadata, fmt.Errorf("Could not parse url (%s) in config: %s", conf.Address, err)
 	}
 
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("Unsupported URL scheme `%s'", u.Scheme)
+		return nil, metadata, fmt.Errorf("Unsupported URL scheme `%s'", u.Scheme)
 	}
 
 	if conf.BasePath == "" {
@@ -75,90 +85,29 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, error) {
 		Trace: tracer,
 	}
 
-	var shouldRenew bool
-	var ttl time.Duration
 	authType := vaultAuthToken
 	if conf.Auth.RoleID != "" || conf.Auth.SecretID != "" {
 		if conf.Auth.Token != "" {
-			return nil, fmt.Errorf("Cannot provide both Token and AppRole authentication methods")
+			return nil, metadata, fmt.Errorf("Cannot provide both Token and AppRole authentication methods")
 		}
 
 		authType = vaultAuthApprole
-
-		output, err := client.AuthApprole(conf.Auth.RoleID, conf.Auth.SecretID)
-		if err != nil {
-			return nil, fmt.Errorf("Error performing AppRole authentication: %s", err)
-		}
-
-		if output.Renewable {
-			shouldRenew = true
-			ttl = output.LeaseDuration
-		}
 	} else {
-		//It's a token!
-		info, err := client.TokenInfoSelf()
+		attemptTime := time.Now()
+		tokenInfo, err := client.TokenInfoSelf()
 		if err != nil {
-			return nil, fmt.Errorf("Error looking up token information: %s", err)
+			return nil, metadata, fmt.Errorf("Could not get token info: %s", err)
 		}
-
-		//Is it a renewable token?
-		if info.Renewable {
-			shouldRenew = true
-			ttl = info.CreationTTL
-			if ttl > 0 {
-				//Give it an initial renew so that its remaining TTL is similar to its total TTL
-				err = client.TokenRenewSelf()
-				if err != nil {
-					return nil, fmt.Errorf("Could not perform initial renewal of renewable token: %s", err)
-				}
-			}
-		}
-	}
-
-	if shouldRenew && ttl > 0 {
-		renewalInterval := ttl / 2
-		fmt.Printf("Renewing Vault token every %s\n", renewalInterval)
-		go func() {
-			lastSuccessfulRefresh := time.Now()
-
-			for range time.Tick(renewalInterval) {
-				attemptTime := time.Now()
-				var err error
-				if time.Since(lastSuccessfulRefresh) > ttl {
-					if authType == vaultAuthApprole {
-						fmt.Println("Renewing Vault token using AppRole authentication")
-						_, err = client.AuthApprole(conf.Auth.RoleID, conf.Auth.SecretID)
-					} else {
-						fmt.Printf("Token is expired - no way to get new token for Vault. Stopping further renewal attempts.")
-						return
-					}
-				} else {
-					fmt.Println("Renewing Vault token using self-renewal")
-					err = client.TokenRenewSelf()
-				}
-
-				if err != nil {
-					fmt.Printf("Failed to renew token to Vault: %s\n", err)
-				} else {
-					lastSuccessfulRefresh = attemptTime
-					fmt.Println("Successfully renewed Vault token")
-				}
-			}
-		}()
-	} else {
-		fmt.Printf("Will not renew Vault token because ")
-		if !shouldRenew {
-			fmt.Printf("token is not renewable\n")
-		} else if ttl <= 0 {
-			fmt.Printf("token never expires\n")
-		}
+		metadata.renewalDeadline = attemptTime.Add(tokenInfo.TTL)
 	}
 
 	return &VaultAccessor{
 		client:   client.NewKV(),
 		basePath: conf.BasePath,
-	}, nil
-
+		authType: authType,
+		roleID:   conf.Auth.RoleID,
+		secretID: conf.Auth.SecretID,
+	}, metadata, nil
 }
 
 //Get attempts to get the secret stored at the requested backend path and
@@ -204,6 +153,66 @@ func (v *VaultAccessor) list(path string) (PathList, error) {
 	}
 
 	return leaves, nil
+}
+
+func (v *VaultAccessor) Authenticate(last interface{}) (
+	time.Duration,
+	interface{},
+	error,
+) {
+	lastMetadata := last.(vaultAuthMetadata)
+	shouldRefresh := time.Now().Before(lastMetadata.renewalDeadline)
+	var (
+		ttl time.Duration
+		err error
+	)
+
+	start := time.Now()
+
+	switch v.authType {
+	case vaultAuthToken:
+		ttl, err = v.authToken()
+
+	case vaultAuthApprole:
+		if shouldRefresh {
+			ttl, err = v.authToken()
+		} else {
+			ttl, err = v.authApprole()
+		}
+	}
+	if err != nil {
+		return TTLUnknown, last, err
+	}
+
+	return ttl, vaultAuthMetadata{renewalDeadline: start.Add(ttl)}, nil
+}
+
+func (v *VaultAccessor) authToken() (ttl time.Duration, err error) {
+	err = v.client.Client.TokenRenewSelf()
+	if err != nil {
+		err = fmt.Errorf("Could not renew token: %s", err)
+		return
+	}
+
+	info, err := v.client.Client.TokenInfoSelf()
+	if err != nil {
+		err = fmt.Errorf("Error looking up token information after auth: %s", err)
+		return
+	}
+
+	ttl = info.TTL
+	return
+}
+
+func (v *VaultAccessor) authApprole() (ttl time.Duration, err error) {
+	output, err := v.client.Client.AuthApprole(v.roleID, v.secretID)
+	if err != nil {
+		err = fmt.Errorf("Error performing AppRole authentication: %s", err)
+		return
+	}
+
+	ttl = output.LeaseDuration
+	return
 }
 
 func canonizePath(path string) string {

@@ -5,6 +5,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/url"
+	"time"
 )
 
 type TLSClientAccessor struct {
@@ -15,19 +16,28 @@ type TLSClientConfig struct {
 	Hosts []string `yaml:"hosts"`
 }
 
-func newTLSClientAccessor(conf TLSClientConfig) (*TLSClientAccessor, error) {
+func newTLSClientAccessor(conf TLSClientConfig) (*TLSClientAccessor, interface{}, error) {
 	ret := &TLSClientAccessor{}
 	if len(conf.Hosts) == 0 {
-		return nil, fmt.Errorf("No hosts list was specified in the configuration")
+		return nil, nil, fmt.Errorf("No hosts list was specified in the configuration")
 	}
 
 	for _, host := range conf.Hosts {
 		thisURL, err := url.Parse(host)
 		if err != nil {
-			return nil, fmt.Errorf("The configured hosts list contained an invalid URL (%s): %s", host, err)
+			return nil, nil, fmt.Errorf("The configured hosts list contained an invalid URL (%s): %s", host, err)
 		}
 
 		ret.hosts = append(ret.hosts, thisURL.String())
+	}
+
+	return ret, nil, nil
+}
+
+func (t *TLSClientAccessor) List() (PathList, error) {
+	ret := make(PathList, 0, len(t.hosts))
+	for _, host := range t.hosts {
+		ret = append(ret, host)
 	}
 
 	return ret, nil
@@ -67,11 +77,6 @@ func (t *TLSClientAccessor) Get(path string) (map[string]string, error) {
 	return ret, nil
 }
 
-func (t *TLSClientAccessor) List() (PathList, error) {
-	ret := make(PathList, 0, len(t.hosts))
-	for _, host := range t.hosts {
-		ret = append(ret, host)
-	}
-
-	return ret, nil
+func (t *TLSClientAccessor) Authenticate(_ interface{}) (time.Duration, interface{}, error) {
+	return TTLInfinite, nil, nil
 }

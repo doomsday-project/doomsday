@@ -47,7 +47,7 @@ func Start(conf Config) error {
 		}
 
 		log.WriteF("Configuring backend `%s' of type `%s'", b.Name, b.Type)
-		thisBackend, err := storage.NewAccessor(b.Type, b.Properties)
+		thisBackend, authState, err := storage.NewAccessor(b.Type, b.Properties)
 		if err != nil {
 			return fmt.Errorf("Error configuring backend `%s': %s", b.Name, err)
 		}
@@ -57,14 +57,21 @@ func Start(conf Config) error {
 
 		sources = append(sources,
 			Source{
-				Core:     &thisCore,
-				Interval: time.Duration(b.RefreshInterval) * time.Minute,
+				Core:         &thisCore,
+				Interval:     time.Duration(b.RefreshInterval) * time.Minute,
+				authMetadata: authState,
 			},
 		)
 	}
 
 	manager := NewSourceManager(sources, log)
-	manager.BackgroundScheduler()
+
+	log.WriteF("Starting background scheduler")
+
+	err = manager.BackgroundScheduler()
+	if err != nil {
+		return fmt.Errorf("Error starting scheduler: %s", err)
+	}
 
 	log.WriteF("Began asynchronous cache population")
 	log.WriteF("Configuring frontend authentication")
@@ -89,6 +96,7 @@ func Start(conf Config) error {
 	router.HandleFunc("/v1/auth", authorizer.LoginHandler()).Methods("POST")
 	router.HandleFunc("/v1/cache", auth(getCache(manager))).Methods("GET")
 	router.HandleFunc("/v1/cache/refresh", auth(refreshCache(manager))).Methods("POST")
+	router.HandleFunc("/v1/scheduler", auth(getScheduler(manager))).Methods("GET")
 
 	if len(conf.Server.Dev.Mappings) > 0 {
 		for file, servePath := range conf.Server.Dev.Mappings {
@@ -172,6 +180,58 @@ func refreshCache(manager *SourceManager) func(w http.ResponseWriter, r *http.Re
 	return func(w http.ResponseWriter, r *http.Request) {
 		go manager.RefreshAll()
 		w.WriteHeader(204)
+	}
+}
+
+func getScheduler(manager *SourceManager) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		schedData := manager.SchedulerState()
+		respRaw := doomsday.GetSchedulerResponse{
+			Running: []doomsday.GetSchedulerTask{},
+			Pending: []doomsday.GetSchedulerTask{},
+		}
+
+		for i := range schedData.Workers {
+			respRaw.Workers = append(respRaw.Workers, doomsday.GetSchedulerWorker{
+				ID:      schedData.Workers[i].ID,
+				State:   schedData.Workers[i].State,
+				StateAt: schedData.Workers[i].StateAt.Unix(),
+			})
+		}
+
+		for i := range schedData.Running {
+			respRaw.Running = append(respRaw.Running, doomsday.GetSchedulerTask{
+				At:       schedData.Running[i].At.Unix(),
+				Backend:  schedData.Running[i].Backend,
+				Reason:   schedData.Running[i].Reason,
+				Kind:     schedData.Running[i].Kind,
+				ID:       schedData.Running[i].ID,
+				State:    schedData.Running[i].State,
+				WorkerID: schedData.Running[i].WorkerID,
+			})
+		}
+
+		for i := range schedData.Pending {
+			respRaw.Pending = append(respRaw.Pending, doomsday.GetSchedulerTask{
+				At:       schedData.Pending[i].At.Unix(),
+				Backend:  schedData.Pending[i].Backend,
+				Reason:   schedData.Pending[i].Reason,
+				Kind:     schedData.Pending[i].Kind,
+				ID:       schedData.Pending[i].ID,
+				State:    schedData.Pending[i].State,
+				WorkerID: -1,
+			})
+		}
+
+		resp, err := json.Marshal(&respRaw)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		writeBody(w, resp)
 	}
 }
 

@@ -12,6 +12,12 @@ import (
 	"time"
 )
 
+const (
+	AuthNoop = iota
+	AuthClientCredentials
+	AuthPassword
+)
+
 type Client struct {
 	URL               string
 	SkipTLSValidation bool

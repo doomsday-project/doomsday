@@ -1,50 +1,22 @@
 package server
 
 import (
+	"fmt"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/doomsday-project/doomsday/client/doomsday"
 	"github.com/doomsday-project/doomsday/server/logger"
 )
 
-type Source struct {
-	Core     *Core
-	Interval time.Duration
-	nextRun  time.Time
-}
-
-//Bump sets nextRun to now + interval
-func (s *Source) Bump() {
-	s.nextRun = time.Now().Add(s.Interval)
-}
-
-func (s *Source) Refresh(global *Cache, mode string, log *logger.Logger) {
-	log.WriteF("Running %s populate of `%s'", mode, s.Core.Name)
-	startedAt := time.Now()
-	old := s.Core.Cache()
-	if old == nil {
-		old = NewCache()
-	}
-	results, err := s.Core.Populate()
-	if err != nil {
-		log.WriteF("Error populating info from backend `%s': %s", s.Core.Name, err)
-		return
-	}
-	global.ApplyDiff(old, s.Core.Cache())
-	log.WriteF("Finished %s populate of `%s' after %s. %d/%d paths searched. %d certs found",
-		mode, s.Core.Name, time.Since(startedAt), results.NumSuccess, results.NumPaths, results.NumCerts)
-}
+const (
+	MinAuthInterval      = 5 * time.Second
+	ExpiredRetryInterval = 5 * time.Minute
+)
 
 type SourceManager struct {
-	//sources is a static view of the queue, such that the get calls don't need
-	// to sync with the populate calls. Otherwise, we would need to read-lock on
-	// get calls so that the order of the queue doesn't shift from underneath us
-	// as the async scheduler is running
 	sources []Source
-	queue   []*Source
-	lock    sync.RWMutex
+	queue   *taskQueue
 	log     *logger.Logger
 	global  *Cache
 }
@@ -54,61 +26,51 @@ func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
 		panic("No logger was given")
 	}
 
-	queue := make([]*Source, 0, len(sources))
-	for i := range sources {
-		queue = append(queue, &sources[i])
-	}
+	globalCache := NewCache()
+	//TODO: Make the number of workers configurable
+	queue := newTaskQueue(globalCache, 4, log)
 
 	return &SourceManager{
 		sources: sources,
 		queue:   queue,
 		log:     log,
-		global:  NewCache(),
+		global:  globalCache,
 	}
 }
 
-func (s *SourceManager) BackgroundScheduler() {
-	if len(s.sources) == 0 {
-		return
-	}
-
-	go func() {
-		for {
-			//Because ad-hoc refreshes can happen asynchronously, this thread may wake
-			//before its time to populate again because the refresh has pushed it back.
-			//In that case, just reevaluate your sleep time and come back later
-			s.lock.Lock()
-			current := s.queue[0]
-			shouldRun := !(time.Now().Before(current.nextRun))
-			if shouldRun {
-				current.Bump()
-				s.sortQueue()
-			}
-			s.lock.Unlock()
-
-			if shouldRun {
-				current.Refresh(s.global, "scheduled", s.log)
-			}
-
-			s.lock.RLock()
-			nextTime := s.queue[0].nextRun
-			s.lock.RUnlock()
-			time.Sleep(time.Until(nextTime))
+func (s *SourceManager) BackgroundScheduler() error {
+	for i := range s.sources {
+		s.sources[i].Auth(s.log)
+		if s.sources[i].authStatus.LastErr != nil {
+			return fmt.Errorf("Error performing initial auth for backend `%s': %s",
+				s.sources[i].Core.Name,
+				s.sources[i].authStatus.LastErr)
 		}
-	}()
-}
+	}
 
-func (s *SourceManager) sortQueue() {
-	//This is a naive sort when only one thing can change order. Also, we should
-	//be using a linked-list heap for performance. But considering that the number
-	//of backends will be in the single digits... I really don't care about either
-	//of those things. I've instead decided to fill the lines of code that I've
-	//saved with that decision by writing this comment.
-	sort.Slice(s.queue,
-		func(i, j int) bool {
-			return s.queue[i].nextRun.Before(s.queue[j].nextRun)
-		},
-	)
+	now := time.Now()
+
+	for i := range s.sources {
+		s.queue.enqueue(managerTask{
+			kind:    queueTaskKindRefresh,
+			source:  &s.sources[i],
+			runTime: now,
+			reason:  runReasonSchedule,
+		})
+
+		nextAuthTime, skipAuth := s.sources[i].CalcNextAuth()
+		if !skipAuth {
+			s.queue.enqueue(managerTask{
+				kind:    queueTaskKindAuth,
+				source:  &s.sources[i],
+				runTime: nextAuthTime,
+				reason:  runReasonSchedule,
+			})
+		}
+	}
+
+	s.queue.start()
+	return nil
 }
 
 func (s *SourceManager) Data() doomsday.CacheItems {
@@ -133,21 +95,17 @@ func (s *SourceManager) Data() doomsday.CacheItems {
 }
 
 func (s *SourceManager) RefreshAll() {
-	//How long must have passed before we'll refresh a backend by request to avoid spamming
-	const tooRecentThreshold time.Duration = time.Minute
-	for _, current := range s.sources {
-		s.lock.Lock()
-		lastRun := current.nextRun.Add(-current.Interval)
-		cutoffTime := time.Now().Add(-(tooRecentThreshold))
-		shouldRun := lastRun.Before(cutoffTime)
-		if shouldRun {
-			current.Bump()
-			s.sortQueue()
-		}
-		s.lock.Unlock()
-
-		if shouldRun {
-			current.Refresh(s.global, "ad-hoc", s.log)
-		}
+	now := time.Now()
+	for i := range s.sources {
+		s.queue.enqueue(managerTask{
+			source:  &s.sources[i],
+			kind:    queueTaskKindRefresh,
+			runTime: now,
+			reason:  runReasonAdhoc,
+		})
 	}
+}
+
+func (s *SourceManager) SchedulerState() SchedulerState {
+	return s.queue.dumpState()
 }
