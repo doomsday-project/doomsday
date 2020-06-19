@@ -56,6 +56,8 @@ backends:
     - starkandwayne.com
     - shieldproject.io
     - genesisproject.io
+    # (number) (default: 20) How many seconds to wait before giving up on a host.
+    #timeout:  20
 
 # Pivotal Ops Manager. https://network.pivotal.io/products/ops-manager
 - type: opsmgr

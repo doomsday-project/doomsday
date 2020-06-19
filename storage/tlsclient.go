@@ -4,16 +4,20 @@ import (
 	"crypto/tls"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"net/url"
+	"os"
 	"time"
 )
 
 type TLSClientAccessor struct {
-	hosts []string
+	hosts   []string
+	timeout time.Duration
 }
 
 type TLSClientConfig struct {
-	Hosts []string `yaml:"hosts"`
+	Hosts   []string `yaml:"hosts"`
+	Timeout int      `yaml:"timeout"`
 }
 
 func newTLSClientAccessor(conf TLSClientConfig) (*TLSClientAccessor, interface{}, error) {
@@ -29,6 +33,14 @@ func newTLSClientAccessor(conf TLSClientConfig) (*TLSClientAccessor, interface{}
 		}
 
 		ret.hosts = append(ret.hosts, thisURL.String())
+	}
+
+	if conf.Timeout < 0 {
+		conf.Timeout = 0
+	}
+
+	if conf.Timeout != 0 {
+		ret.timeout = time.Second * time.Duration(conf.Timeout)
 	}
 
 	return ret, nil, nil
@@ -57,9 +69,13 @@ func (t *TLSClientAccessor) Get(path string) (map[string]string, error) {
 		u.Host = fmt.Sprintf("%s:443", u.Host)
 	}
 
-	conn, err := tls.Dial("tcp", u.Host, &tls.Config{InsecureSkipVerify: true})
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: t.timeout}, "tcp", u.Host, &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
-		return nil, err
+		//TODO: We should implement an actual warning system instead of just not
+		// erroring
+		//TODO: Also, we need to get the actual logger into these storage implementations
+		fmt.Fprintf(os.Stderr, "Failed to connect to %s: %s\n", path, err)
+		return nil, nil
 	}
 
 	certs := conn.ConnectionState().PeerCertificates
