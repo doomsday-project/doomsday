@@ -107,16 +107,24 @@ func (v *ConfigServerAccessor) Get(path string) (map[string]string, error) {
 		return nil, err
 	}
 
-	if cred.Type == "certificate" {
-		if certInterface, found := cred.Value.(map[string]interface{})["certificate"]; found && certInterface != nil {
+	var keysToCheck []string
+	switch cred.Type {
+	case "certificate":
+		keysToCheck = []string{"certificate", "ca"}
+	}
+
+	ret := map[string]string{}
+
+	for _, key := range keysToCheck {
+		if certInterface, found := cred.Value.(map[string]interface{})[key]; found && certInterface != nil {
 			certAsString, isString := certInterface.(string)
 			if isString {
-				return map[string]string{"certificate": certAsString}, nil
+				ret[key] = certAsString
 			}
 		}
 	}
 
-	return nil, nil
+	return ret, nil
 }
 
 func (v *ConfigServerAccessor) Authenticate(last interface{}) (
