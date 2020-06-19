@@ -108,8 +108,11 @@ func (v *ConfigServerAccessor) Get(path string) (map[string]string, error) {
 	}
 
 	if cred.Type == "certificate" {
-		if certInterface, found := cred.Value.(map[string]interface{})["certificate"]; found {
-			return map[string]string{"certificate": certInterface.(string)}, nil
+		if certInterface, found := cred.Value.(map[string]interface{})["certificate"]; found && certInterface != nil {
+			certAsString, isString := certInterface.(string)
+			if isString {
+				return map[string]string{"certificate": certAsString}, nil
+			}
 		}
 	}
 
