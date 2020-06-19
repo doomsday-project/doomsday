@@ -33,6 +33,7 @@ embed: tsc
 	GOOS="" GOARCH="" go run web/embed/main.go web/embed/mappings.yml
 
 tsc:
+	cd web && npm install
 	tsc --project web/tsconfig.json
 
 clean:

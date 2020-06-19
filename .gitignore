@@ -4,4 +4,4 @@ ddayconfig.yml
 doomsday-darwin
 doomsday-linux
 !client/doomsday
-web/node_modules/
+node_modules
