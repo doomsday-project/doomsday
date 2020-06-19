@@ -68,10 +68,10 @@ class DashboardPage extends PageBase {
 
     if (lists.length == 0) {
       this.certsElement.template("no-certs-page");
-      return;
+    } else {
+      this.certsElement.template("cert-list-group", { lists: lists });
+      this.certsElement.show();
     }
-
-    this.certsElement.template("cert-list-group", { lists: lists });
     this.showMoreButton = $("#certs-show-more");
     this.showMoreButton.on("click", (e: JQuery.Event) => {
       e.preventDefault();
@@ -84,7 +84,7 @@ class DashboardPage extends PageBase {
       this.showMoreButton.prop("disabled", false);
       return false;
     })
-    this.certsElement.show();
+    return;
   }
 
 
