@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -87,8 +89,8 @@ func newConfigServerAccessor(conf ConfigServerConfig) (
 }
 
 //List attempts to get all of the paths in the config server
-func (v *ConfigServerAccessor) List() (PathList, error) {
-	paths, err := v.credhub.FindByPath("/")
+func (a *ConfigServerAccessor) List() (PathList, error) {
+	paths, err := a.credhub.FindByPath("/")
 	if err != nil {
 		return nil, fmt.Errorf("Could not get paths in config server: %s", err)
 	}
@@ -101,33 +103,41 @@ func (v *ConfigServerAccessor) List() (PathList, error) {
 	return ret, nil
 }
 
-func (v *ConfigServerAccessor) Get(path string) (map[string]string, error) {
-	cred, err := v.credhub.GetLatestVersion(path)
+func (a *ConfigServerAccessor) Get(path string) (map[string]string, error) {
+	cred, err := a.credhub.GetLatestVersion(path)
 	if err != nil {
 		return nil, err
 	}
 
-	var keysToCheck []string
-	switch cred.Type {
-	case "certificate":
-		keysToCheck = []string{"certificate", "ca"}
+	if cred.Type != "certificate" &&
+		cred.Type != "value" &&
+		cred.Type != "json" {
+		return nil, nil
 	}
 
 	ret := map[string]string{}
-
-	for _, key := range keysToCheck {
-		if certInterface, found := cred.Value.(map[string]interface{})[key]; found && certInterface != nil {
-			certAsString, isString := certInterface.(string)
-			if isString {
-				ret[key] = certAsString
-			}
-		}
-	}
-
+	a.walkForStrings(cred.Value, ret, []string{"value"})
 	return ret, nil
 }
 
-func (v *ConfigServerAccessor) Authenticate(last interface{}) (
+func (a *ConfigServerAccessor) walkForStrings(value interface{}, agg map[string]string, path []string) {
+	switch v := value.(type) {
+	case string:
+		agg[strings.Join(path, ".")] = v
+
+	case map[string]interface{}:
+		for pathSeg, nextVal := range v {
+			a.walkForStrings(nextVal, agg, append(path, pathSeg))
+		}
+
+	case []interface{}:
+		for pathSeg, nextVal := range v {
+			a.walkForStrings(nextVal, agg, append(path, strconv.FormatInt(int64(pathSeg), 10)))
+		}
+	}
+}
+
+func (a *ConfigServerAccessor) Authenticate(last interface{}) (
 	TTL time.Duration,
 	next interface{},
 	err error,
@@ -135,13 +145,13 @@ func (v *ConfigServerAccessor) Authenticate(last interface{}) (
 	var authResp *uaa.AuthResponse
 	metadata := last.(configServerAuthMetadata)
 
-	switch v.authType {
+	switch a.authType {
 	case uaa.AuthNoop:
 		return TTLInfinite, metadata, nil
 
 	case uaa.AuthClientCredentials:
 		fmt.Fprintf(os.Stderr, "Performing client credentials auth for Credhub\n")
-		authResp, err = v.uaaClient.ClientCredentials(v.clientID, v.clientSecret)
+		authResp, err = a.uaaClient.ClientCredentials(a.clientID, a.clientSecret)
 
 	case uaa.AuthPassword:
 		attemptTime := time.Now()
@@ -149,10 +159,10 @@ func (v *ConfigServerAccessor) Authenticate(last interface{}) (
 		// to renew the token just as the token is becoming unrenewable (and therefore err)
 		if attemptTime.Add(1 * time.Second).Before(metadata.renewalDeadline) {
 			fmt.Fprintf(os.Stderr, "Refreshing auth using refresh token for Credhub\n")
-			authResp, err = v.uaaClient.Refresh(v.clientID, v.clientSecret, v.credhub.Auth.(*refreshTokenStrategy).RefreshToken())
+			authResp, err = a.uaaClient.Refresh(a.clientID, a.clientSecret, a.credhub.Auth.(*refreshTokenStrategy).RefreshToken())
 		} else {
 			fmt.Fprintf(os.Stderr, "Performing password auth for Credhub\n")
-			authResp, err = v.uaaClient.Password(v.clientID, v.clientSecret, v.username, v.password)
+			authResp, err = a.uaaClient.Password(a.clientID, a.clientSecret, a.username, a.password)
 		}
 
 		if err == nil {
@@ -166,7 +176,7 @@ func (v *ConfigServerAccessor) Authenticate(last interface{}) (
 		return TTLUnknown, metadata, err
 	}
 
-	v.credhub.Auth.(*refreshTokenStrategy).SetTokens(authResp.AccessToken, authResp.RefreshToken)
+	a.credhub.Auth.(*refreshTokenStrategy).SetTokens(authResp.AccessToken, authResp.RefreshToken)
 
 	return authResp.TTL, metadata, nil
 }
