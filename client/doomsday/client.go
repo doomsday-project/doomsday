@@ -175,17 +175,25 @@ func (c *Client) Info() (*InfoResponse, error) {
 }
 
 type GetSchedulerResponse struct {
-	Running []GetSchedulerTask `json:"running"`
-	Pending []GetSchedulerTask `json:"pending"`
+	Running []GetSchedulerTask   `json:"running"`
+	Pending []GetSchedulerTask   `json:"pending"`
+	Workers []GetSchedulerWorker `json:"workers"`
 }
 
 type GetSchedulerTask struct {
-	At      int64  `json:"at"`
-	Backend string `json:"backend"`
-	Reason  string `json:"reason"`
-	Kind    string `json:"kind"`
+	At       int64  `json:"at"`
+	Backend  string `json:"backend"`
+	Reason   string `json:"reason"`
+	Kind     string `json:"kind"`
+	ID       uint   `json:"id"`
+	State    string `json:"state"`
+	WorkerID int    `json:"worker_id"`
+}
+
+type GetSchedulerWorker struct {
 	ID      uint   `json:"id"`
 	State   string `json:"state"`
+	StateAt int64  `json:"state_at"`
 }
 
 func (c *Client) GetSchedulerState() (*GetSchedulerResponse, error) {

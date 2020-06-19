@@ -72,12 +72,13 @@ func (s taskState) String() string {
 }
 
 type managerTask struct {
-	id      uint
-	kind    taskKind
-	source  *Source
-	runTime time.Time
-	reason  runReason
-	state   taskState
+	id             uint
+	kind           taskKind
+	source         *Source
+	runTime        time.Time
+	reason         runReason
+	state          taskState
+	assignedWorker *taskWorker
 }
 
 func (m *managerTask) durationUntil() time.Duration {
@@ -103,48 +104,20 @@ type taskQueue struct {
 	cond        *sync.Cond
 	log         *logger.Logger
 	globalCache *Cache
+	numWorkers  uint
+	workers     []*taskWorker
 	nextTaskID  uint
 }
 
-func newTaskQueue(cache *Cache, log *logger.Logger) *taskQueue {
+func newTaskQueue(cache *Cache, numWorkers uint, log *logger.Logger) *taskQueue {
 	lock := &sync.Mutex{}
 	return &taskQueue{
 		lock:        lock,
 		log:         log,
 		cond:        sync.NewCond(lock),
 		globalCache: cache,
+		numWorkers:  numWorkers,
 	}
-}
-
-//next blocks until there is a task for this thread to handle. it then dequeues
-// and returns that task.
-func (t *taskQueue) runNext() managerTask {
-	t.lock.Lock()
-
-	for t.empty() || t.data[0].state == queueTaskStatePending {
-		t.cond.Wait()
-	}
-
-	ret := t.dequeueNoLock()
-
-	if ret.state == queueTaskStateSkip {
-		t.lock.Unlock()
-		t.log.WriteF("Scheduler skipping %s %s of `%s'", ret.reason, ret.kind, ret.source.Core.Name)
-		return ret
-	}
-
-	t.running = append(t.running, ret)
-	t.lock.Unlock()
-
-	t.log.WriteF("Scheduler running %s %s of `%s'", ret.reason, ret.kind, ret.source.Core.Name)
-
-	ret.run(t.globalCache, t.log)
-
-	t.lock.Lock()
-	t.running.deleteTaskWithID(ret.id)
-	t.lock.Unlock()
-
-	return ret
 }
 
 //enqueue puts a task into the queue, unique by the tuple source, taskType. If
@@ -270,46 +243,17 @@ func (t *taskQueue) empty() bool {
 }
 
 func (t *taskQueue) start() {
-	go func() {
-		for {
-			next := t.runNext()
-			t.scheduleNextRunOf(next)
-		}
-	}()
-}
-
-func (t *taskQueue) scheduleNextRunOf(task managerTask) {
-	if task.reason == runReasonAdhoc {
-		return
+	workerFactory := newTaskWorkerFactory(t, t.globalCache, t.log)
+	for i := uint(0); i < t.numWorkers; i++ {
+		t.workers = append(t.workers, workerFactory.newWorker())
+		t.workers[i].consumeScheduler()
 	}
-
-	var nextTime time.Time
-	var skipSched bool
-
-	switch task.kind {
-	case queueTaskKindAuth:
-		nextTime, skipSched = task.source.CalcNextAuth()
-
-	case queueTaskKindRefresh:
-		nextTime = task.source.CalcNextRefresh()
-	}
-
-	if skipSched {
-		t.log.WriteF("Skipping further scheduling of `%s' for `%s'", task.kind.String(), task.source.Core.Name)
-		return
-	}
-
-	t.enqueue(managerTask{
-		source:  task.source,
-		runTime: nextTime,
-		reason:  runReasonSchedule,
-		kind:    task.kind,
-	})
 }
 
 type SchedulerState struct {
 	Running []SchedulerTask `json:"running"`
 	Pending []SchedulerTask `json:"pending"`
+	Workers []WorkerDump    `json:"workers"`
 }
 
 func (s SchedulerState) String() string {
@@ -320,12 +264,19 @@ func (s SchedulerState) String() string {
 }
 
 type SchedulerTask struct {
+	ID       uint      `json:"id"`
+	At       time.Time `json:"at"`
+	Backend  string    `json:"backend"`
+	Reason   string    `json:"reason"`
+	Kind     string    `json:"kind"`
+	State    string    `json:"state"`
+	WorkerID int       `json:"worker"`
+}
+
+type WorkerDump struct {
 	ID      uint      `json:"id"`
-	At      time.Time `json:"at"`
-	Backend string    `json:"backend"`
-	Reason  string    `json:"reason"`
-	Kind    string    `json:"kind"`
 	State   string    `json:"state"`
+	StateAt time.Time `json:"state_at"`
 }
 
 func (t *taskQueue) dumpState() SchedulerState {
@@ -342,23 +293,34 @@ func (t *taskQueue) dumpStateNoLock() SchedulerState {
 
 	for _, task := range t.running {
 		ret.Running = append(ret.Running, SchedulerTask{
-			ID:      task.id,
-			At:      task.runTime,
-			Backend: task.source.Core.Name,
-			Reason:  task.reason.String(),
-			Kind:    task.kind.String(),
-			State:   task.state.String(),
+			ID:       task.id,
+			At:       task.runTime,
+			Backend:  task.source.Core.Name,
+			Reason:   task.reason.String(),
+			Kind:     task.kind.String(),
+			State:    task.state.String(),
+			WorkerID: int(task.assignedWorker.id),
 		})
 	}
 
 	for _, task := range t.data {
 		ret.Pending = append(ret.Pending, SchedulerTask{
-			ID:      task.id,
-			At:      task.runTime,
-			Backend: task.source.Core.Name,
-			Reason:  task.reason.String(),
-			Kind:    task.kind.String(),
-			State:   task.state.String(),
+			ID:       task.id,
+			At:       task.runTime,
+			Backend:  task.source.Core.Name,
+			Reason:   task.reason.String(),
+			Kind:     task.kind.String(),
+			State:    task.state.String(),
+			WorkerID: -1,
+		})
+	}
+
+	for _, worker := range t.workers {
+		state, stateAt := worker.State()
+		ret.Workers = append(ret.Workers, WorkerDump{
+			ID:      worker.id,
+			State:   state.String(),
+			StateAt: stateAt,
 		})
 	}
 

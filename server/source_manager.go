@@ -27,7 +27,8 @@ func NewSourceManager(sources []Source, log *logger.Logger) *SourceManager {
 	}
 
 	globalCache := NewCache()
-	queue := newTaskQueue(globalCache, log)
+	//TODO: Make the number of workers configurable
+	queue := newTaskQueue(globalCache, 4, log)
 
 	return &SourceManager{
 		sources: sources,
