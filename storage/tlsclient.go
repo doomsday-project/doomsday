@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"regexp"
 	"time"
 )
 
@@ -26,13 +27,24 @@ func newTLSClientAccessor(conf TLSClientConfig) (*TLSClientAccessor, interface{}
 		return nil, nil, fmt.Errorf("No hosts list was specified in the configuration")
 	}
 
+	schemeRegex := regexp.MustCompile("^.+?://.+")
 	for _, host := range conf.Hosts {
-		thisURL, err := url.Parse(host)
+
+		toParse := host
+		if !schemeRegex.Match([]byte(host)) {
+			toParse = "garbage://" + host
+		}
+
+		thisURL, err := url.Parse(toParse)
 		if err != nil {
 			return nil, nil, fmt.Errorf("The configured hosts list contained an invalid URL (%s): %s", host, err)
 		}
 
-		ret.hosts = append(ret.hosts, thisURL.String())
+		if thisURL.Port() == "" {
+			thisURL.Host = thisURL.Host + ":443"
+		}
+
+		ret.hosts = append(ret.hosts, thisURL.Host)
 	}
 
 	if conf.Timeout < 0 {
@@ -55,26 +67,13 @@ func (t *TLSClientAccessor) List() (PathList, error) {
 	return ret, nil
 }
 
-func (t *TLSClientAccessor) Get(path string) (map[string]string, error) {
-	u, err := url.Parse(path)
-	if err != nil {
-		panic("TLS Client Accessor somehow couldn't parse a URL that it already checked")
-	}
-
-	if u.Host == "" {
-		u, _ = url.Parse(fmt.Sprintf("garbage://%s", path))
-	}
-
-	if u.Port() == "" {
-		u.Host = fmt.Sprintf("%s:443", u.Host)
-	}
-
-	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: t.timeout}, "tcp", u.Host, &tls.Config{InsecureSkipVerify: true})
+func (t *TLSClientAccessor) Get(host string) (map[string]string, error) {
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: t.timeout}, "tcp", host, &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		//TODO: We should implement an actual warning system instead of just not
 		// erroring
 		//TODO: Also, we need to get the actual logger into these storage implementations
-		fmt.Fprintf(os.Stderr, "Failed to connect to %s: %s\n", path, err)
+		fmt.Fprintf(os.Stderr, "Failed to connect to %s: %s\n", host, err)
 		return nil, nil
 	}
 

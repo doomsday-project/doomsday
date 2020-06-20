@@ -50,7 +50,9 @@ backends:
 - type: tlsclient
   name: mytlsclient
   properties:
-    # (list) A list of URLs to connect to. You should omit the scheme of the URLs
+    # (list) A list of URLs to connect to. The scheme of the URLs is optional,
+    # but will be ignored. If no port is provided on a host, 443 will be used
+    # by default.
     hosts:
     # (string)
     - starkandwayne.com
