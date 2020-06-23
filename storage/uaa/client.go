@@ -2,6 +2,7 @@ package uaa
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -21,13 +22,19 @@ const (
 type Client struct {
 	URL               string
 	SkipTLSValidation bool
+	CACerts           *x509.CertPool
 }
 
 func (c *Client) client() *http.Client {
+	if c.CACerts == nil {
+		c.CACerts, _ = x509.SystemCertPool()
+	}
+
 	return &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: c.SkipTLSValidation,
+				RootCAs:            c.CACerts,
 			},
 			Dial: (&net.Dialer{
 				Timeout:   5 * time.Second,

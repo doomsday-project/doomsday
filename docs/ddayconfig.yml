@@ -124,9 +124,25 @@ backends:
     # (string) The URL where the Credhub API is located
     address: https://127.0.0.1:8844
 
-    # (bool) (default: false) Is the Credhub API cert not trusted? Make
-    # this true. Otherwise leave it false.
-    insecure_skip_verify: false
+    # (bool) (default: false) This will cause the CredHub and UAA clients to
+    # not check for proper subject alternative names or a proper chain of trust
+    # on the certificate returned by those respective servers. Handy if you
+    # need it, but not recommended for production use. If the certificate
+    # served by the Credhub and/or UAA is not trusted by your system, consider
+    # using the `ca_certs` option.
+    #insecure_skip_verify: true
+
+    # (string) If set, the CredHub and UAA client will exclusively use the
+    # following certs as its trusted certificate pool when performing a TLS
+    # handshake to the targeted CredHub and associated UAA servers. If this is
+    # not set, then the client will use the system's trusted certificate pool.
+    #ca_certs: |
+    #  -----BEGIN CERTIFICATE-----
+    #  I'm a cert
+    #  -----END CERTIFICATE-----
+    #  -----BEGIN CERTIFICATE-----
+    #  I'm another cert
+    #  -----END CERTIFICATE-----
 
     # (hash) Options for authorizing to the UAA attached to your Credhub.
     # This is the same as the Ops Manager auth options. Check that out.

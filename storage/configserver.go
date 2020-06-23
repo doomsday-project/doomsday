@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"crypto/x509"
 	"fmt"
 	"net/http"
 	"os"
@@ -26,6 +27,7 @@ type ConfigServerAccessor struct {
 type ConfigServerConfig struct {
 	Address            string `yaml:"address"`
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+	CACerts            string `yaml:"ca_certs"`
 	Auth               struct {
 		GrantType    string `yaml:"grant_type"`
 		ClientID     string `yaml:"client_id"`
@@ -45,10 +47,17 @@ func newConfigServerAccessor(conf ConfigServerConfig) (
 	error,
 ) {
 	metadata := configServerAuthMetadata{}
-	c, err := credhub.New(
-		conf.Address,
-		credhub.SkipTLSValidation(conf.InsecureSkipVerify),
-	)
+
+	credhubOpts := []credhub.Option{}
+	if conf.InsecureSkipVerify {
+		credhubOpts = append(credhubOpts, credhub.SkipTLSValidation(true))
+	}
+
+	if conf.CACerts != "" {
+		credhubOpts = append(credhubOpts, credhub.CaCerts(conf.CACerts))
+	}
+
+	c, err := credhub.New(conf.Address, credhubOpts...)
 	if err != nil {
 		return nil, metadata, fmt.Errorf("Could not create config server client: %s", err)
 	}
@@ -72,11 +81,21 @@ func newConfigServerAccessor(conf ConfigServerConfig) (
 		return nil, metadata, fmt.Errorf("Unknown auth grant_type `%s'", conf.Auth.GrantType)
 	}
 
+	certPool, _ := x509.SystemCertPool()
+	if conf.CACerts != "" {
+		certPool = x509.NewCertPool()
+		ok := certPool.AppendCertsFromPEM([]byte(conf.CACerts))
+		if !ok {
+			return nil, metadata, fmt.Errorf("Could not parse provided CA certificates")
+		}
+	}
+
 	ret := &ConfigServerAccessor{
 		credhub: c,
 		uaaClient: &uaa.Client{
 			URL:               authURL,
 			SkipTLSValidation: conf.InsecureSkipVerify,
+			CACerts:           certPool,
 		},
 		authType:     authType,
 		clientID:     conf.Auth.ClientID,
