@@ -2,6 +2,7 @@ package storage
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,6 +33,7 @@ type VaultAccessor struct {
 type VaultConfig struct {
 	Address            string `yaml:"address"`
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+	CACerts            string `yaml:"ca_certs"`
 	BasePath           string `yaml:"base_path"`
 	Trace              bool   `yaml:"trace"`
 	Auth               struct {
@@ -71,6 +73,18 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, vaultAuthMetadata, erro
 		tracer = os.Stdout
 	}
 
+	caPool, err := x509.SystemCertPool()
+	if err != nil {
+		caPool = nil
+	}
+	if conf.CACerts != "" {
+		caPool = x509.NewCertPool()
+		gotCerts := caPool.AppendCertsFromPEM([]byte(conf.CACerts))
+		if !gotCerts {
+			return nil, metadata, fmt.Errorf("CACerts property was provided, but no certificates were successfully parsed")
+		}
+	}
+
 	client := &vaultkv.Client{
 		VaultURL:  u,
 		AuthToken: conf.Auth.Token,
@@ -78,6 +92,7 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, vaultAuthMetadata, erro
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
 					InsecureSkipVerify: conf.InsecureSkipVerify,
+					RootCAs:            caPool,
 				},
 				MaxIdleConnsPerHost: runtime.NumCPU(),
 			},

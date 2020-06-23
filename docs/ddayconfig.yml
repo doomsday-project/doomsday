@@ -5,14 +5,17 @@
 #  - type: <backend-type>
 #    name: <backend-name>
 #    properties:
-#      backend: specific
+#      backend-specific-property: example
 #
 # type: (string, enum) Currently supported types are "vault", "opsmgr",
 #   "credhub", and "tlsclient".
+#
 # name: (string) Attached to objects returned from the doomsday API to
 #   identify where each item came from. Defaults to the backend `type` string.
+#
 # refresh_interval: (number) How many minutes between refreshing information from
 #   this backend. Defaults to 30
+#
 # properties (hash): Backend-specific. You should look below for how to
 #   configure each one.
 backends:
@@ -23,16 +26,34 @@ backends:
   properties:
     # (string) The URL where the Vault API is located
     address: https://127.0.0.1:443
-    # (bool) (default: false) Is Vault listening for TLS but the cert isn't
-    # trusted? Make this true. Otherwise leave it false.
-    insecure_skip_verify: true
+
+    # (bool) (default: false) This will cause the Vault client to not check
+    # for proper subject alternative names or a proper chain of trust on the
+    # certificate returned by the Vault. Handy if you need it, but not
+    # recommended for production use. If the certificate served by the Vault
+    # is not trusted by your system, consider using the `ca_certs` option.
+    #insecure_skip_verify: true
+
+    # (string) If set, the Vault client will exclusively use the following certs
+    # as its trusted certificate pool when performing a TLS handshake to the
+    # targeted Vault. If this is not set, then the client will use the system's
+    # trusted certificate pool.
+    #ca_certs: |
+    #  -----BEGIN CERTIFICATE-----
+    #  I'm a cert
+    #  -----END CERTIFICATE-----
+    #  -----BEGIN CERTIFICATE-----
+    #  I'm another cert
+    #  -----END CERTIFICATE-----
+
     # (string) This is the path to begin looking for Vault secrets. Everything under this
     # path will be searched. Defaults to "secret/" if not present.
     base_path: "secret/"
+
     # (boolean) If set to true, requests to and responses from the Vault will
     # be logged to stdout. You probably only want this if you're debugging.
     #trace: true
-    #
+
     # (hash) Options for authorizing to Vault
     # Must either provide "token" for Token auth or "role_id" and "secret_id" for AppRole
     # If a token is given, it should either have no expiry or be renewable.
@@ -40,8 +61,10 @@ backends:
     auth:
       # (string) A Vault authentication token.
       token: 01234567-89ab-cdef-0123-456789abcdef
+
       # (string) An AppRole role ID
       # role_id: 01234567-89ab-cdef-0123-456789abcdef
+
       # (string): An AppRole secret ID
       # secret_id: s.ImaSecret
 
@@ -54,10 +77,11 @@ backends:
     # but will be ignored. If no port is provided on a host, 443 will be used
     # by default.
     hosts:
-    # (string)
+    # (string) The hostname to track
     - starkandwayne.com
     - shieldproject.io
     - genesisproject.io
+
     # (number) (default: 20) How many seconds to wait before giving up on a host.
     #timeout:  20
 
@@ -67,8 +91,10 @@ backends:
   properties:
     # (string) The URL of the Ops Manager API location.
     address: https://127.0.0.1:443
+
     # (bool) (default: false) Is the Ops Manager API cert not trusted? Make
     # this true. Otherwise leave it false.
+
     insecure_skip_verify: false
     # (hash) Options for authorizing to the UAA attached to your Ops Manager
     auth:
@@ -77,12 +103,16 @@ backends:
       # provide "client_id" and "client_secret". If it's "password", then provide
       # "client_id", "client_secret", "username", and "password"
       grant_type: password
+
       # (string) The id of the OAuth client
       client_id: opsman
+
       # (string) The secret of the OAuth client
       client_secret: ""
+
       # (string) The username of the user to use (if doing password grant type)
       username: admin
+
       # (string) The password of the user to use (if doing password grant type)
       password: password
 
@@ -93,9 +123,11 @@ backends:
   properties:
     # (string) The URL where the Credhub API is located
     address: https://127.0.0.1:8844
+
     # (bool) (default: false) Is the Credhub API cert not trusted? Make
     # this true. Otherwise leave it false.
     insecure_skip_verify: false
+
     # (hash) Options for authorizing to the UAA attached to your Credhub.
     # This is the same as the Ops Manager auth options. Check that out.
     auth:
@@ -109,6 +141,7 @@ backends:
 server:
   # (number) (default: 8111)
   port: 8111
+  #
   # (hash) If present, this have Doomsday's API listen with TLS.
   tls:
     # (string) An x509 certificate to serve from the API
