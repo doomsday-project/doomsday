@@ -2,6 +2,7 @@ package storage
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -33,6 +34,7 @@ type OmAccessor struct {
 type OmConfig struct {
 	Address            string `yaml:"address"`
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+	CACerts            string `yaml:"ca_certs"`
 	Auth               struct {
 		GrantType    string `yaml:"grant_type"`
 		Username     string `yaml:"username"`
@@ -46,19 +48,29 @@ type omAuthMetadata struct {
 	renewalDeadline time.Time
 }
 
-func newOmClient(conf OmConfig) *http.Client {
+func newOmClient(conf OmConfig) (*http.Client, error) {
+	certPool, _ := x509.SystemCertPool()
+	if conf.CACerts != "" {
+		certPool = x509.NewCertPool()
+		ok := certPool.AppendCertsFromPEM([]byte(conf.CACerts))
+		if !ok {
+			return nil, fmt.Errorf("Could not parse provided CA certificates")
+		}
+	}
+
 	return &http.Client{
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: conf.InsecureSkipVerify,
+				RootCAs:            certPool,
 			},
 			Dial: (&net.Dialer{
 				Timeout:   5 * time.Second,
 				KeepAlive: 30 * time.Second,
 			}).Dial,
 		},
-	}
+	}, nil
 }
 
 func newOmAccessor(conf OmConfig) (*OmAccessor, omAuthMetadata, error) {
@@ -72,10 +84,24 @@ func newOmAccessor(conf OmConfig) (*OmAccessor, omAuthMetadata, error) {
 		u.Scheme = "https"
 	}
 
-	var client = newOmClient(conf)
+	client, err := newOmClient(conf)
+	if err != nil {
+		return nil, metadata, err
+	}
+
+	certPool, _ := x509.SystemCertPool()
+	if conf.CACerts != "" {
+		certPool = x509.NewCertPool()
+		ok := certPool.AppendCertsFromPEM([]byte(conf.CACerts))
+		if !ok {
+			return nil, metadata, fmt.Errorf("Could not parse provided CA certificates")
+		}
+	}
+
 	var uaaClient = &uaa.Client{
 		URL:               fmt.Sprintf("%s/uaa/oauth/token", u.String()),
 		SkipTLSValidation: conf.InsecureSkipVerify,
+		CACerts:           certPool,
 	}
 
 	var authType uint64

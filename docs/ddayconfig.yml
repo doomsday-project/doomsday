@@ -92,10 +92,27 @@ backends:
     # (string) The URL of the Ops Manager API location.
     address: https://127.0.0.1:443
 
-    # (bool) (default: false) Is the Ops Manager API cert not trusted? Make
-    # this true. Otherwise leave it false.
+    # (bool) (default: false) This will cause the Ops Manager and UAA clients to
+    # not check for proper subject alternative names or a proper chain of trust
+    # on the certificate returned by those respective servers. Handy if you
+    # need it, but not recommended for production use. If the certificate
+    # served by the Ops Manager and/or UAA is not trusted by your system,
+    # consider using the `ca_certs` option.
+    #insecure_skip_verify: true
 
-    insecure_skip_verify: false
+    # (string) If set, the Ops Manager and UAA client will exclusively use the
+    # following certs as its trusted certificate pool when performing a TLS
+    # handshake to the targeted Ops Manager and associated UAA servers. If this
+    # is not set, then the client will use the system's trusted certificate
+    # pool.
+    #ca_certs: |
+    #  -----BEGIN CERTIFICATE-----
+    #  I'm a cert
+    #  -----END CERTIFICATE-----
+    #  -----BEGIN CERTIFICATE-----
+    #  I'm another cert
+    #  -----END CERTIFICATE-----
+
     # (hash) Options for authorizing to the UAA attached to your Ops Manager
     auth:
       # (string) The grant type with which you are going to authenticate to the UAA
