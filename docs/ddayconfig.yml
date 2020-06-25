@@ -54,6 +54,10 @@ backends:
     # be logged to stdout. You probably only want this if you're debugging.
     #trace: true
 
+    # (string) An optional Vault enterprise namespace to use for all Vault
+    # requests.
+    #namespace: "my-namespace"
+
     # (hash) Options for authorizing to Vault
     # Must either provide "token" for Token auth or "role_id" and "secret_id" for AppRole
     # If a token is given, it should either have no expiry or be renewable.

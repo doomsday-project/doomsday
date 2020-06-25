@@ -34,6 +34,7 @@ type VaultConfig struct {
 	Address            string `yaml:"address"`
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
 	CACerts            string `yaml:"ca_certs"`
+	Namespace          string `yaml:"namespace"`
 	BasePath           string `yaml:"base_path"`
 	Trace              bool   `yaml:"trace"`
 	Auth               struct {
@@ -97,7 +98,8 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, vaultAuthMetadata, erro
 				MaxIdleConnsPerHost: runtime.NumCPU(),
 			},
 		},
-		Trace: tracer,
+		Namespace: conf.Namespace,
+		Trace:     tracer,
 	}
 
 	authType := vaultAuthToken
