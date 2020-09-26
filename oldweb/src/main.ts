@@ -1,15 +1,18 @@
-/// <reference path="./client.ts"/>
-/// <reference path="./pager.ts"/>
-/// <reference path="./cookie.ts"/>
-/// <reference path="./pages/login.ts"/>
-/// <reference path="./pages/certs.ts"/>
-/// <reference path="./color.ts"/>
+import Vue       from "vue";
+import VueRouter from "vue-router";
+import LoginView from "./views/LoginView.vue";
 
-//Because Lens.js adds template to $()
-interface JQuery {
-	template(template: string, options?: object): any;
-}
+const router = new VueRouter({
+	routes: [
+		{ path: '/', component: LoginView }
+	]
+})
 
+const app = new Vue({
+	router,
+}).$mount("#app")
+
+/*
 let NORMAL_HAMBURGER_WIDTH;
 let NORMAL_HAMBURGER_HEIGHT;
 let HAMBURGER_BOX_PADDING;
@@ -119,3 +122,4 @@ function toggleHamburgerMenu() {
 $('#hamburger-box').click(function () {
 	toggleHamburgerMenu();
 });
+*/

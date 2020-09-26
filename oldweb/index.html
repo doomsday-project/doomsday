@@ -53,9 +53,7 @@
 						<input type="submit" id="login-form-submit-button" value="sign in"/>
 					</div>
 				</form>
-				[[ if (typeof _.error_message !== 'undefined') { ]]
-					<div class="login-error">[[= _.error_message ]]</div>
-				[[ } ]]
+				<div class="login-error" v-if="error_message">{{ error_message }}</div>
 			</div>
 		</div>
 	</script>

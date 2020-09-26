@@ -1,0 +1,14 @@
+{
+	"compilerOptions": {
+		"allowJs": true,
+		"target": "es6",
+		"removeComments": true,
+		"moduleResolution": "node",
+		"outDir": "build"
+	},
+	"include": [
+		"src/**/*.ts",
+		"src/**/*.vue",
+		"src/*.ts"
+	]
+}
