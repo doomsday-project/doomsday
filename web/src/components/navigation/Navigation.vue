@@ -18,14 +18,14 @@
       </div>
     </div>
 
-		<div id="hamburger-menu" 
+    <div id="hamburger-menu" 
          class="sticky navbar-border"
          v-bind:class="{ hamburgerMenuOpen: hamburger && menuOpen }">
-			<div id="logout-button" 
+      <div id="logout-button" 
            class="hamburger-menu-button navbar-button no-select">
         logout
       </div>
-		</div>
+    </div>
   </div>
 </template>
 
@@ -42,18 +42,18 @@ export default class Navigation extends Vue{
 
 <style scoped>
 #navbar {
-	background-color: #252525;
+  background-color: #252525;
   display: flex;
   position: fixed;
-	height: 60px;
+  height: 60px;
   z-index: 100;
-	top: 0;
-	width: 100%;
+  top: 0;
+  width: 100%;
 }
 
 #logo {
   color: white;
-	font-size: 40px;
+  font-size: 40px;
 }
 
 #sub-logo {
@@ -62,13 +62,13 @@ export default class Navigation extends Vue{
 }
 
 #hamburger {
-	height: 25px;
-	width: 25px;
-	flex: 1 1 auto;
+  height: 25px;
+  width: 25px;
+  flex: 1 1 auto;
 }
 
 .no-select {
-	-webkit-touch-callout: none;
+  -webkit-touch-callout: none;
   -webkit-user-select: none;
   -khtml-user-select: none;
   -moz-user-select: none;
@@ -85,17 +85,17 @@ export default class Navigation extends Vue{
 }
 
 .navbar-content {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding-left: 15px;
-	padding-right: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 15px;
+  padding-right: 15px;
 }
 
 .navbar-border {
-	border-right-color: rgba(255, 255, 255, 0.3);
-	border-right-style: solid;
-	border-right-width: thin;
+  border-right-color: rgba(255, 255, 255, 0.3);
+  border-right-style: solid;
+  border-right-width: thin;
 }
 
 .cls-1{fill:#ffffff;stroke:#fff;stroke-miterlimit:10;}
@@ -112,12 +112,12 @@ export default class Navigation extends Vue{
 }
 
 #hamburger-menu {
-	background-color: rgba(37, 37, 37, 0.9);
-	height: calc(100% - 60px);
-	width: 250px;
-	z-index: 100;
-	top: 60px;
-	left: -251px;
+  background-color: rgba(37, 37, 37, 0.9);
+  height: calc(100% - 60px);
+  width: 250px;
+  z-index: 100;
+  top: 60px;
+  left: -251px;
   display: inline-block;
   position: fixed;
   transition: left .25s;
@@ -129,27 +129,21 @@ export default class Navigation extends Vue{
 }
 
 .hamburger-menu-button {
-	display: flex;
-	align-items: center;
-	align-content: center;
-	justify-content: center;
-	height: 30px;
-	padding: 5px 20px 5px 20px;
-	font-size: 24px;
-	color: white;
-	border-style: solid none solid none;
-	border-width: thin;
-	border-color: rgba(255, 255, 255, 0.3);
-	-webkit-touch-callout: none;
-  -webkit-user-select: none;
-  -khtml-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-	background-color: #252525;
+  display: flex;
+  align-items: center;
+  align-content: center;
+  justify-content: center;
+  height: 30px;
+  padding: 5px 20px 5px 20px;
+  font-size: 24px;
+  color: white;
+  border-style: solid none solid none;
+  border-width: thin;
+  border-color: rgba(255, 255, 255, 0.3);
+  background-color: #252525;
 }
 
 .hamburger-menu-button-inactive {
-	color: grey !important;
+  color: grey !important;
 }
 </style>
