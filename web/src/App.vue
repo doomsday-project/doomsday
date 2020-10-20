@@ -1,8 +1,22 @@
 <template>
   <div id="app">
+    <Navigation/>
+    <div id="nav-buffer"/>
     <router-view/>
   </div>
 </template>
+
+<script lang="ts">
+import { Vue, Component } from 'vue-property-decorator';
+import Navigation from './components/navigation/Navigation.vue';
+
+@Component({
+  components: {
+    Navigation
+  }
+})
+export default class App extends Vue {}
+</script>
 
 <style>
 body {
@@ -17,16 +31,7 @@ body {
   color: #2c3e50;
 }
 
-#nav {
-  padding: 30px;
-}
-
-#nav a {
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-#nav a.router-link-exact-active {
-  color: #42b983;
+#nav-buffer {
+  margin-top: 60px;
 }
 </style>

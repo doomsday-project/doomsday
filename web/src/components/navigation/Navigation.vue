@@ -1,11 +1,10 @@
 <template>
   <div id="nav-container">
-    <div id="navbar">
+    <div id="navbar" v-bind:class="{ 'hide-hamburger': !hamburger }">
       <div id="hamburger-box" 
           class="hamburger-box navbar-content navbar-border navbar-button"
-          v-if="hamburger"
-          v-bind:class="{ hamburgerBoxOpen: hamburger && menuOpen }"
-          v-on:click="menuOpen=!menuOpen">
+          v-bind:class="{ hamburgerBoxOpen: menuOpen }"
+          v-on:click="menuOpen=(!menuOpen) && hamburger">
         <svg id="hamburger" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" viewBox="0 0 201 146.17"><g id="Layer_2" data-name="Layer 2"><g id="Layer_1-2" data-name="Layer 1"><rect class="cls-1" x="0.5" y="0.5" width="200" height="29.27"/><rect class="cls-1" x="0.5" y="59.04" width="200" height="29.27"/><rect class="cls-1" x="0.5" y="116.4" width="200" height="29.27"/></g></g></svg>
       </div>
 
@@ -20,7 +19,7 @@
 
     <div id="hamburger-menu" 
          class="sticky navbar-border"
-         v-bind:class="{ hamburgerMenuOpen: hamburger && menuOpen }">
+         v-bind:class="{ hamburgerMenuOpen: menuOpen }">
       <div id="logout-button" 
            class="hamburger-menu-button navbar-button no-select">
         logout
@@ -31,12 +30,24 @@
 
 <script lang="ts">
 
-import { Component, Prop, Vue } from 'vue-property-decorator';
+import { Component, Vue, Watch } from 'vue-property-decorator';
+import { Route } from 'vue-router';
+
+const hamburgerBlacklist: string[] = [
+  "/",
+  "/login",
+]
 
 @Component
-export default class Navigation extends Vue{
-  @Prop() private hamburger!: boolean;
-  menuOpen = false;
+export default class Navigation extends Vue {
+  menuOpen  = false;
+  hamburger = false;
+
+  @Watch('$route', {immediate: true}) 
+  onPathChange(dest: Route) {
+    this.hamburger = !hamburgerBlacklist.includes(dest.path)
+    this.menuOpen  = this.menuOpen && this.hamburger;
+  }
 }
 </script>
 
@@ -45,10 +56,17 @@ export default class Navigation extends Vue{
   background-color: #252525;
   display: flex;
   position: fixed;
+  left: 0px;
   height: 60px;
   z-index: 100;
   top: 0;
-  width: 100%;
+  width: 1000%;
+  transition: left .06s linear;
+}
+
+.hide-hamburger {
+  transition-delay: .19s !important;
+  left: -56px !important;
 }
 
 #logo {
@@ -107,7 +125,7 @@ export default class Navigation extends Vue{
 }
 
 .hamburgerBoxOpen {
-  width: 220px !important;
+  width: 219px !important;
   transition-delay: .05s !important;
 }
 
