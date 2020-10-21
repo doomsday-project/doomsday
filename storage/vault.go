@@ -46,6 +46,7 @@ type VaultConfig struct {
 
 type vaultAuthMetadata struct {
 	renewalDeadline time.Time
+	rootToken       bool
 }
 
 func newVaultAccessor(conf VaultConfig) (*VaultAccessor, vaultAuthMetadata, error) {
@@ -115,6 +116,11 @@ func newVaultAccessor(conf VaultConfig) (*VaultAccessor, vaultAuthMetadata, erro
 		if err != nil {
 			return nil, metadata, fmt.Errorf("Could not get token info: %s", err)
 		}
+
+		if tokenInfo.ExpireTime.IsZero() {
+			metadata.rootToken = true
+		}
+
 		metadata.renewalDeadline = attemptTime.Add(tokenInfo.TTL)
 	}
 
@@ -188,6 +194,9 @@ func (v *VaultAccessor) Authenticate(last interface{}) (
 
 	switch v.authType {
 	case vaultAuthToken:
+		if lastMetadata.rootToken {
+			return TTLInfinite, last, nil
+		}
 		ttl, err = v.authToken()
 
 	case vaultAuthApprole:
