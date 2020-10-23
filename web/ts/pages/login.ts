@@ -43,11 +43,12 @@ class LoginPage extends PageBase {
           self.ctx.pager.display(new DashboardPage());
         })
         .catch(e => {
-          if (e.error == "error" && e.code == 401) {
+          if (e.code == 401) {
             self.ctx.pager.display(new LoginPage("The username and password did not match"));
           }
           else {
             self.ctx.pager.display(new LoginPage("Something went wrong!"));
+            console.log(`Something went wrong: ${e.errorMessage}`);
           }
         });
       return false;

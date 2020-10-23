@@ -35,11 +35,12 @@ class DashboardPage extends PageBase {
         this.certUpdateID = setTimeout(this.updateCertList.bind(this), 60 * 1000);
       })
       .catch(e => {
-        if (e.error == "error" && e.code == 401) {
+        if (e.code == 401) {
           deleteCookie('doomsday-token');
           this.ctx.pager.display(new LoginPage("Your session has expired"));
         } else {
           this.ctx.pager.display(new LoginPage("Something went wrong!"));
+          console.log(`Something went wrong: ${e.errorMessage}`);
         }
       });
   }

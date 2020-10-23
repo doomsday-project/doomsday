@@ -44,7 +44,9 @@ $(document).ready(function () {
 				pager.display(new DashboardPage());
 			}
 		})
-		.catch(() => { console.log("Something went wrong!"); });
+		.catch((e: APIError) => {
+			console.log(`Something went wrong: ${e.errorMessage}`);
+		});
 });
 
 const FRAMERATE = 42;
