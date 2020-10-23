@@ -14,26 +14,36 @@ class APIError {
 }
 class Doomsday {
     doRequest(method, path, data) {
-        return $.ajax({
+        return fetch(path, {
             method: method,
-            url: path,
-            dataType: "json",
-            data: (data ? JSON.stringify(data) : undefined)
-        }).promise();
-    }
-    handleFailure(jqXHR, textStatus) {
-        throw new APIError(textStatus, jqXHR.status);
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: data ? JSON.stringify(data) : undefined,
+        })
+            .catch(() => { throw new APIError("Unexpected fetch error", 0); })
+            .then(resp => {
+            if (resp.ok) {
+                return resp.json();
+            }
+            throw new APIError(resp.statusText, resp.status);
+        }).catch(e => {
+            if (e instanceof APIError) {
+                throw e;
+            }
+            throw new APIError("JSON parsing failed", 0);
+        });
     }
     fetchAuthType() {
         return this.doRequest("GET", "/v1/info")
-            .then(data => (data.auth_type == "Userpass" ? AuthMethod.USERPASS : AuthMethod.NONE), this.handleFailure);
+            .then(data => (data.auth_type == "Userpass" ? AuthMethod.USERPASS : AuthMethod.NONE));
     }
     authUser(username, password) {
         return this.doRequest("POST", "/v1/auth", {
             username: username,
             password: password
-        })
-            .then(() => { }, this.handleFailure);
+        });
     }
     fetchCerts() {
         return this.doRequest("GET", "/v1/cache")
@@ -43,7 +53,7 @@ class Doomsday {
                 ret.push($.extend(new Certificate(), cert));
             }
             return ret;
-        }, this.handleFailure);
+        });
     }
 }
 class Certificate {
@@ -218,11 +228,12 @@ class LoginPage extends PageBase {
                 self.ctx.pager.display(new DashboardPage());
             })
                 .catch(e => {
-                if (e.error == "error" && e.code == 401) {
+                if (e.code == 401) {
                     self.ctx.pager.display(new LoginPage("The username and password did not match"));
                 }
                 else {
                     self.ctx.pager.display(new LoginPage("Something went wrong!"));
+                    console.log(`Something went wrong: ${e.errorMessage}`);
                 }
             });
             return false;
@@ -254,12 +265,13 @@ class DashboardPage extends PageBase {
             this.certUpdateID = setTimeout(this.updateCertList.bind(this), 60 * 1000);
         })
             .catch(e => {
-            if (e.error == "error" && e.code == 401) {
+            if (e.code == 401) {
                 deleteCookie('doomsday-token');
                 this.ctx.pager.display(new LoginPage("Your session has expired"));
             }
             else {
                 this.ctx.pager.display(new LoginPage("Something went wrong!"));
+                console.log(`Something went wrong: ${e.errorMessage}`);
             }
         });
     }
@@ -425,7 +437,9 @@ $(document).ready(function () {
             pager.display(new DashboardPage());
         }
     })
-        .catch(() => { console.log("Something went wrong!"); });
+        .catch((e) => {
+        console.log(`Something went wrong: ${e.errorMessage}`);
+    });
 });
 const FRAMERATE = 42;
 const FRAME_INTERVAL = 1000 / FRAMERATE;
