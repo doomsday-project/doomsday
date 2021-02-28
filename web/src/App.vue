@@ -49,10 +49,10 @@ body {
   overflow-y: auto;
 	background: repeating-linear-gradient(
 		45deg,
-		rgba(68, 68, 68, 1),
-		rgba(68, 68, 68, 1) 60px,
-		rgba(68, 68, 68, 0.85) 60px,
-		rgba(68, 68, 68, 0.85) 120px
+		rgb(68, 68, 68),
+		rgb(68, 68, 68) 60px,
+		rgb(96, 96, 96) 60px,
+		rgb(96, 96, 96) 120px
   );
 }
 </style>

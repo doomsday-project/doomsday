@@ -1,5 +1,5 @@
 <template>
-  <div id="viewport">
+  <div id="dashboard">
     <h1>DASHBOARD</h1>
     <button v-on:click="$router.push({name: 'Login'})">
       to login
