@@ -36,6 +36,7 @@ button {
 
 .active:hover {
   background: rgba(255,255,255,0.1) !important;
+  cursor: pointer;
 }
 
 .active:active {

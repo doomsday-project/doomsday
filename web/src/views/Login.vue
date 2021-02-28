@@ -189,7 +189,6 @@ export default class Login extends Vue {
   margin-bottom: 6px;
   display: grid;
   font-size: 16px;
-  font-weight: bold;
 }
 
 .login-row input[type=text], input[type=password] {
