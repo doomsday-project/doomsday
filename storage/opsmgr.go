@@ -150,7 +150,7 @@ func (v *OmAccessor) Get(path string) (map[string]string, error) {
 		if pathDetails[0] == "ops_manager" {
 			return v.opsmanRootFallback(pathDetails[0], pathDetails[1])
 		}
-		if strings.Contains(pathDetails[0], "p-bosh-") {
+		if strings.HasPrefix(pathDetails[0], "p-bosh-") {
 			return v.directorFallback(pathDetails[0], pathDetails[1])
 		}
 		return map[string]string{}, err
@@ -166,7 +166,7 @@ func (v *OmAccessor) Get(path string) (map[string]string, error) {
 //List attempts to list the paths in the ops manager that could have certs
 func (v *OmAccessor) List() (PathList, error) {
 	var finalPaths []string
-	path := fmt.Sprintf("/api/v0/deployed/certificates")
+	path := "/api/v0/deployed/certificates"
 
 	var certificateReference struct {
 		Certificates []struct {
