@@ -14,6 +14,7 @@ require (
 	github.com/starkandwayne/goutils v0.0.0-20190115202530-896b8a6904be
 	github.com/thomasmitchell/go-shout v0.0.0-20200117221442-ad6c1a8d1669
 	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
+	golang.org/x/sys v0.0.0-20220614162138-6c1b26c55098 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/yaml.v2 v2.3.0
 )
