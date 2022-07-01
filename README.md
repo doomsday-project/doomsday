@@ -49,3 +49,13 @@ Then, if your cf app manifest is called `manifest.yml`, run
 ```sh
 cf push -f manifest.yml
 ```
+
+## Development Notes
+
+Make sure your GOPATH has your $HOME/go and this directory in its settings.
+We are assuming the GOROOT has been set when you installed the go package.
+
+```sh
+export GOPATH="$HOME/go:$PWD"
+```
+

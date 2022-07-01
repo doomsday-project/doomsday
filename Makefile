@@ -8,6 +8,8 @@ ifneq ("$(DIRTY_LINE)", "")
   DIRTY := +
 endif
 VERSION ?= development
+LOCAL_GOOS=$(shell go env GOOS)
+LOCAL_GOARCH=$(shell go env GOARCH)
 LDFLAGS := -X "github.com/doomsday-project/doomsday/version.Version=$(VERSION)-$(COMMIT_HASH)$(DIRTY)"
 BUILD := go build -v -ldflags='$(LDFLAGS)' -o $(OUTPUT_NAME) $(BUILD_TARGET)
 
@@ -31,14 +33,14 @@ darwin-arm64:
 
 #: Builds amd64 OSX executable
 darwin-amd64:
-	GOOS=darwin GOARCH=arm64 OUTPUT_NAME=$(APP_NAME)-darwin-amd64 VERSION="$(VERSION)" $(MAKE) server
+	GOOS=darwin GOARCH=amd64 OUTPUT_NAME=$(APP_NAME)-darwin-amd64 VERSION="$(VERSION)" $(MAKE) server
 
 #: Builds amd64 linux executable
 linux:
 	GOOS=linux GOARCH=amd64 OUTPUT_NAME=$(APP_NAME)-linux VERSION="$(VERSION)" $(MAKE) server
 
 #: Build client and server doomsday components
-all: embed darwin linux
+all: embed darwin linux server
 
 embed: tsc
 	GOOS="" GOARCH="" go run web/embed/main.go web/embed/mappings.yml
