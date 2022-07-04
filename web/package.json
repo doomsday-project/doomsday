@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "@types/jquery": "^3.5.1"
+    "@types/jquery": "^3.5.1",
+    "@types/sizzle": "^2.3.3"
   }
 }
