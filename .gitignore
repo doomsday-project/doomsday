@@ -3,6 +3,8 @@ ddayconfig.yml
 !docs/ddayconfig.yml
 doomsday-darwin-amd64
 doomsday-darwin-arm64
+doomsday-darwin
 doomsday-linux
+doomsday-linux-amd64
 !client/doomsday
 node_modules
