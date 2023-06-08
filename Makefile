@@ -8,7 +8,7 @@ ifneq ("$(DIRTY_LINE)", "")
   DIRTY := +
 endif
 VERSION ?= development
-LDFLAGS := -X "main.Version=$(VERSION)-$(COMMIT_HASH)$(DIRTY)"
+LDFLAGS := -X "github.com/doomsday-project/doomsday/version.Version=$(VERSION)-$(COMMIT_HASH)$(DIRTY)"
 BUILD := go build -v -ldflags='$(LDFLAGS)' -o $(OUTPUT_NAME) $(BUILD_TARGET)
 
 .PHONY: build server darwin darwin-amd64 darwin-arm64 linux linux-amd64 embed tsc all clean
