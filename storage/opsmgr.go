@@ -11,6 +11,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -132,6 +133,11 @@ func newOmAccessor(conf OmConfig) (*OmAccessor, omAuthMetadata, error) {
 //Get attempts to get the secret stored at the requested backend path and
 // return it as a map.
 func (v *OmAccessor) Get(path string) (map[string]string, error) {
+	pathDetails := strings.Split(path, "/")
+	if len(pathDetails) != 2 {
+		return map[string]string{}, fmt.Errorf("path '%s' does not properly specify a product guid and property reference", path)
+	}
+
 	var credentials struct {
 		Cred struct {
 			Type  string            `json:"type"`
@@ -139,8 +145,14 @@ func (v *OmAccessor) Get(path string) (map[string]string, error) {
 		} `json:"credential"`
 	}
 
-	respBody, err := v.opsmanAPI(path)
+	respBody, err := v.opsmanAPI(fmt.Sprintf("/api/v0/deployed/products/%s/credentials/%s", pathDetails[0], pathDetails[1]))
 	if err != nil {
+		if pathDetails[0] == "ops_manager" {
+			return v.opsmanRootFallback(pathDetails[0], pathDetails[1])
+		}
+		if strings.HasPrefix(pathDetails[0], "p-bosh-") {
+			return v.directorFallback(pathDetails[0], pathDetails[1])
+		}
 		return map[string]string{}, err
 	}
 
@@ -154,34 +166,130 @@ func (v *OmAccessor) Get(path string) (map[string]string, error) {
 //List attempts to list the paths in the ops manager that could have certs
 func (v *OmAccessor) List() (PathList, error) {
 	var finalPaths []string
-	deployments, err := v.getDeployments()
+	path := "/api/v0/deployed/certificates"
+
+	var certificateReference struct {
+		Certificates []struct {
+			Configurable      bool        `json:"configurable"`
+			IsCa              bool        `json:"is_ca"`
+			PropertyReference string      `json:"property_reference"`
+			PropertyType      string      `json:"property_type"`
+			ProductGUID       string      `json:"product_guid"`
+			Location          string      `json:"location"`
+			VariablePath      interface{} `json:"variable_path"`
+			Issuer            string      `json:"issuer"`
+			ValidFrom         time.Time   `json:"valid_from"`
+			ValidUntil        time.Time   `json:"valid_until"`
+		} `json:"certificates"`
+	}
+
+	respBody, err := v.opsmanAPI(path)
 	if err != nil {
 		return []string{}, err
 	}
 
-	for _, deployment := range deployments {
-		path := fmt.Sprintf("/api/v0/deployed/products/%s/credentials", deployment)
+	err = json.Unmarshal(respBody, &certificateReference)
+	if err != nil {
+		return []string{}, fmt.Errorf("could not unmarshal certificates response: %s\nresponse: `%s`", err, respBody)
+	}
 
-		var credentialReferences struct {
-			Credentials []string `json:"credentials"`
-		}
-
-		respBody, err := v.opsmanAPI(path)
-		if err != nil {
-			return []string{}, err
-		}
-
-		err = json.Unmarshal(respBody, &credentialReferences)
-		if err != nil {
-			return []string{}, fmt.Errorf("could not unmarshal credentials response: %s\nresponse: `%s`", err, respBody)
-		}
-
-		for _, cred := range credentialReferences.Credentials {
-			finalPaths = append(finalPaths, fmt.Sprintf("/api/v0/deployed/products/%s/credentials/%s", deployment, cred))
+	for _, cert := range certificateReference.Certificates {
+		// Only get certs that are stored in opsman - leave credhub certs to use the
+		// credhub backend
+		if cert.Location == "ops_manager" {
+			finalPaths = append(finalPaths, fmt.Sprintf("%s/%s", cert.ProductGUID, cert.PropertyReference))
 		}
 	}
 
 	return finalPaths, nil
+}
+
+func (v *OmAccessor) directorFallback(guid string, property string) (map[string]string, error) {
+	propertyRaw := strings.Split(property, ".")
+	if len(propertyRaw) != 3 {
+		return map[string]string{}, fmt.Errorf("property '%s' is not properly formatted", property)
+	}
+	property = propertyRaw[2]
+
+	var settings struct {
+		Products []map[string]interface{} `json:"products"`
+	}
+
+	respBody, err := v.opsmanAPI("/api/installation_settings")
+	if err != nil {
+		return map[string]string{}, err
+	}
+
+	err = json.Unmarshal(respBody, &settings)
+	if err != nil {
+		return map[string]string{}, fmt.Errorf("could not unmarshal certificates response: %s\nresponse: `%s`", err, respBody)
+	}
+
+	for _, product := range settings.Products {
+		if product["guid"] == guid {
+			propertyMap, isMap := product[property].(map[string]interface{})
+			if !isMap {
+				return map[string]string{}, fmt.Errorf("failed to unmarshal property %s from product in fallback api", property)
+			}
+			key, isMap := propertyMap["cert_pem"].(string)
+			if !isMap {
+				return map[string]string{}, fmt.Errorf("failed to unmarshal cert from property %s in fallback api", property)
+			}
+			return map[string]string{
+				"cert_pem": key,
+			}, nil
+		}
+	}
+
+	return map[string]string{}, nil
+}
+
+func (v *OmAccessor) opsmanRootFallback(guid string, property string) (map[string]string, error) {
+	propertyRaw := strings.Split(property, ".")
+	if len(propertyRaw) != 4 {
+		return map[string]string{}, fmt.Errorf("property '%s' is not properly formatted", property)
+	}
+	property = propertyRaw[2]
+	certGUID := propertyRaw[3]
+
+	var certificateAuthorities struct {
+		CAs []struct {
+			GUID        string    `json:"guid"`
+			Issuer      string    `json:"issuer"`
+			CreatedOn   time.Time `json:"created_on"`
+			ExpiresOn   time.Time `json:"expires_on"`
+			Active      bool      `json:"active"`
+			CertPem     string    `json:"cert_pem"`
+			NatsCertPem string    `json:"nats_cert_pem"`
+		} `json:"certificate_authorities"`
+	}
+
+	respBody, err := v.opsmanAPI("/api/v0/certificate_authorities")
+	if err != nil {
+		return map[string]string{}, err
+	}
+
+	err = json.Unmarshal(respBody, &certificateAuthorities)
+	if err != nil {
+		return map[string]string{}, fmt.Errorf("could not unmarshal certificates response: %s\nresponse: `%s`", err, respBody)
+	}
+
+	for _, ca := range certificateAuthorities.CAs {
+		if ca.GUID == certGUID {
+			if property == "nats_client_ca" {
+				return map[string]string{
+					"cert_pem": ca.NatsCertPem,
+				}, nil
+			}
+			if property == "root_ca" {
+				return map[string]string{
+					"cert_pem": ca.CertPem,
+				}, nil
+			}
+		}
+	}
+
+	return map[string]string{}, nil
 }
 
 func (v *OmAccessor) getDeployments() ([]string, error) {
